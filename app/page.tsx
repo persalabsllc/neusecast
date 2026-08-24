@@ -8,7 +8,6 @@ import {
   Check,
   ChevronRight,
   Layers3,
-  LogIn,
   MapPin,
   MonitorPlay,
   Palette,
@@ -72,17 +71,6 @@ export default function Home() {
             <Link href="/contact">Contact</Link>
           </div>
 
-          <div className="sales-login-links">
-            <Link href="/advertiser">
-              <LogIn size={14} aria-hidden="true" /> Advertiser login
-            </Link>
-            <Link href="/host">
-              <LogIn size={14} aria-hidden="true" /> Host login
-            </Link>
-            <Link className="button button-quiet button-small" href="/control">
-              Control Room
-            </Link>
-          </div>
         </nav>
       </header>
 

@@ -440,21 +440,20 @@ textarea:focus-visible {
   display: grid;
   width: min(1220px, calc(100% - clamp(36px, 8vw, 112px)));
   min-height: 88px;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr;
   align-items: center;
   gap: 32px;
   margin-inline: auto;
 }
 
 .sales-nav-links,
-.sales-login-links,
 .sales-footer-links {
   display: flex;
   align-items: center;
 }
 
 .sales-nav-links {
-  justify-content: center;
+  justify-content: flex-end;
   gap: clamp(16px, 2.5vw, 32px);
 }
 
@@ -469,23 +468,6 @@ textarea:focus-visible {
 .sales-nav-links a:hover,
 .sales-footer-links a:hover {
   color: var(--tide);
-}
-
-.sales-login-links {
-  gap: 15px;
-}
-
-.sales-login-links > a:first-child {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 610;
-}
-
-.sales-login-links > a:first-child:hover {
-  color: var(--paper);
 }
 
 .sales-hero {
@@ -4298,7 +4280,7 @@ a.contact-card:hover { border-color: rgba(67, 221, 193, 0.35); background: rgba(
   }
 
   .sales-nav {
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1fr;
   }
 
   .sales-hero {
@@ -4431,20 +4413,6 @@ a.contact-card:hover { border-color: rgba(67, 221, 193, 0.35); background: rgba(
     display: none;
   }
 
-  .sales-login-links {
-    gap: 9px;
-  }
-
-  .sales-login-links > a:first-child {
-    font-size: 10px;
-  }
-
-  .sales-login-links .button {
-    min-height: 36px;
-    padding-inline: 11px;
-    font-size: 10px;
-  }
-
   .sales-hero {
     padding-block: 68px 86px;
   }
@@ -4553,15 +4521,6 @@ a.contact-card:hover { border-color: rgba(67, 221, 193, 0.35); background: rgba(
 }
 
 @media (max-width: 520px) {
-  .sales-login-links > a:not(.button) {
-    width: 35px;
-    height: 35px;
-    justify-content: center;
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    font-size: 0;
-  }
-
   .sales-nav .brand-mark {
     width: 37px;
     height: 37px;
