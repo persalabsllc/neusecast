@@ -71,6 +71,9 @@ export default function Home() {
           </div>
 
           <div className="sales-login-links">
+            <Link href="/advertiser">
+              <LogIn size={14} aria-hidden="true" /> Advertiser login
+            </Link>
             <Link href="/host">
               <LogIn size={14} aria-hidden="true" /> Host login
             </Link>
@@ -91,9 +94,9 @@ export default function Home() {
             businesses—without depending on clicks, cookies, or social algorithms.
           </p>
           <div className="button-row">
-            <a className="button button-primary" href="#advertisers">
+            <Link className="button button-primary" href="/advertiser/new">
               Request launch pricing <ArrowRight size={17} aria-hidden="true" />
-            </a>
+            </Link>
             <a className="button button-secondary" href="#how-it-works">
               See how it works
             </a>
@@ -257,9 +260,9 @@ export default function Home() {
           </p>
         </div>
         <div className="sales-launch-actions">
-          <a className="button button-primary" href="#advertisers">
+          <Link className="button button-primary" href="/advertiser/new">
             Join as an advertiser <ArrowRight size={17} aria-hidden="true" />
-          </a>
+          </Link>
           <a className="button button-secondary" href="#hosts">Become a founding host</a>
         </div>
       </section>
@@ -298,6 +301,7 @@ export default function Home() {
           <div className="sales-footer-links">
             <a href="#advertisers">Advertise</a>
             <a href="#hosts">Host a screen</a>
+            <Link href="/advertiser">Advertiser login</Link>
             <Link href="/host">Host login</Link>
             <Link href="/control">Control Room login</Link>
           </div>

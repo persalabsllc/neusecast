@@ -5,7 +5,7 @@ import { Brand } from "@/components/brand";
 
 export const metadata: Metadata = {
   title: "Create account",
-  description: "Create the first NeuseCast owner account.",
+  description: "Create a secure NeuseCast account.",
 };
 
 export default function SignUpPage() {
@@ -18,14 +18,14 @@ export default function SignUpPage() {
       <section className="auth-panel">
         <div className="auth-intro">
           <div className="eyebrow">NeuseCast account</div>
-          <h1>Create your owner login.</h1>
-          <p>Use the Persa Labs email address to initialize secure access.</p>
+          <h1>Create your secure login.</h1>
+          <p>Advertisers and host businesses use one account to manage requests, campaigns, and local screen content.</p>
         </div>
         <SignUp
           path="/sign-up"
           routing="path"
           signInUrl="/sign-in"
-          fallbackRedirectUrl="/control"
+          fallbackRedirectUrl="/advertiser"
         />
       </section>
     </main>
