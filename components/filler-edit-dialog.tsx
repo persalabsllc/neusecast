@@ -22,6 +22,7 @@ type EditableFiller = {
   sourceName: string;
   sourceUrl: string;
   artworkUrl: string;
+  artworkCredit: string;
   theme: FillerTheme;
   durationSeconds: number;
   automatic: boolean;
@@ -112,6 +113,7 @@ export function FillerEditDialog({
               <label className="field"><span className="field-label">Source name</span><input name="sourceName" maxLength={160} defaultValue={filler.sourceName} /></label>
               <label className="field"><span className="field-label">Source URL</span><input name="sourceUrl" type="url" defaultValue={filler.sourceUrl} /></label>
               <label className="field field-wide"><span className="field-label">Artwork URL (optional)</span><input name="artworkUrl" type="url" defaultValue={filler.artworkUrl} /></label>
+              <label className="field field-wide"><span className="field-label">Visible artwork credit</span><input name="artworkCredit" maxLength={200} defaultValue={filler.artworkCredit} placeholder="Photo: creator / source / license" /></label>
               <label className="field"><span className="field-label">Theme</span><select name="theme" defaultValue={filler.theme}>{FILLER_THEMES.map((theme) => <option value={theme} key={theme}>{theme[0].toUpperCase() + theme.slice(1)}</option>)}</select></label>
               <label className="field"><span className="field-label">Screen time (seconds)</span><input name="durationSeconds" type="number" min="8" max="30" step="1" defaultValue={filler.durationSeconds} required /></label>
               <div className="field-wide form-actions filler-edit-actions">

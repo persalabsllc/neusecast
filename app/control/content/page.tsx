@@ -244,6 +244,7 @@ export default async function ContentPage({ searchParams }: {
             <label className="field"><span className="field-label">Source name</span><input name="sourceName" maxLength={160} /></label>
             <label className="field"><span className="field-label">Source URL</span><input name="sourceUrl" type="url" /></label>
             <label className="field field-wide"><span className="field-label">Artwork URL (optional)</span><input name="artworkUrl" type="url" /></label>
+            <label className="field field-wide"><span className="field-label">Visible artwork credit</span><input name="artworkCredit" maxLength={200} placeholder="Photo: creator / source / license" /></label>
             <label className="field"><span className="field-label">Theme</span><select name="theme" defaultValue="navy">{FILLER_THEMES.map((theme) => <option value={theme} key={theme}>{theme[0].toUpperCase() + theme.slice(1)}</option>)}</select></label>
             <label className="field"><span className="field-label">Screen time</span><select name="durationSeconds" defaultValue="12"><option value="10">10 seconds</option><option value="12">12 seconds</option><option value="15">15 seconds</option><option value="20">20 seconds</option></select></label>
             <label className="field"><span className="field-label">Expires</span><select name="lifetime" defaultValue="never"><option value="never">Never</option><option value="1_day">After 1 day</option><option value="7_days">After 7 days</option><option value="30_days">After 30 days</option></select></label>
@@ -319,6 +320,7 @@ export default async function ContentPage({ searchParams }: {
                       sourceName: item.sourceName ?? "",
                       sourceUrl: item.sourceUrl ?? "",
                       artworkUrl: item.artworkUrl ?? "",
+                      artworkCredit: metadataText(item.metadata, "artworkCredit") ?? "",
                       theme: (metadataText(item.metadata, "theme") ?? "navy") as (typeof FILLER_THEMES)[number],
                       durationSeconds: metadataNumber(item.metadata, "durationSeconds", 12),
                       automatic: metadataText(item.metadata, "origin") === "automatic",

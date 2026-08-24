@@ -19,16 +19,16 @@ import { Brand } from "@/components/brand";
 import { NEUSECAST_CONTACT } from "@/lib/legal";
 
 export const metadata: Metadata = {
-  title: "Advertise Across Eastern Carolina",
+  title: "Advertise Across 75+ Eastern North Carolina Locations",
   description:
-    "Reach local customers on professionally managed screens inside trusted Eastern Carolina businesses—or apply to host a NeuseCast screen.",
+    "NeuseCast is deployed in 75+ Eastern North Carolina locations. Advertise for $75/month with 12 verified plays per active, compatible screen each broadcast day.",
 };
 
 const advertiserBenefits = [
   {
     icon: Target,
     title: "Cover the whole network",
-    copy: "One transparent plan places your campaign on every active screen, paced for 12 verified plays per screen each day.",
+    copy: "One transparent plan places your campaign on every active, compatible screen, with 12 verified plays per screen each broadcast day.",
   },
   {
     icon: Palette,
@@ -67,7 +67,7 @@ export default function Home() {
             <a href="#advertisers">Advertise</a>
             <a href="#how-it-works">How it works</a>
             <a href="#hosts">Host a screen</a>
-            <a href="#launch">Launch market</a>
+            <a href="#network">Network reach</a>
             <Link href="/contact">Contact</Link>
           </div>
 
@@ -76,12 +76,13 @@ export default function Home() {
 
       <section className="sales-hero sales-container">
         <div className="sales-hero-copy">
-          <div className="eyebrow">Eastern Carolina&apos;s local screen network</div>
-          <h1>Be seen where Eastern Carolina does business.</h1>
+          <div className="eyebrow">75+ locations across Eastern North Carolina</div>
+          <h1>Put your business where local customers already are.</h1>
           <p>
-            NeuseCast puts your message on professionally managed screens inside
-            trusted local restaurants, shops, waiting rooms, gyms, and neighborhood
-            businesses—without depending on clicks, cookies, or social algorithms.
+            NeuseCast delivers polished digital advertising across professionally
+            managed screens in restaurants, shops, waiting rooms, gyms, and other
+            trusted local businesses. Reach people in the real world without competing
+            for clicks or fighting social algorithms.
           </p>
           <div className="button-row">
             <Link className="button button-primary" href="/advertiser/new">
@@ -93,7 +94,10 @@ export default function Home() {
           </div>
           <div className="sales-local-note">
             <Radio size={16} aria-hidden="true" />
-            Built by the local media team behind Captain 97.1 and New Bern Websites.
+            <span>
+              NeuseCast and <a href="https://captain97.com" target="_blank" rel="noreferrer">Captain 97.1</a> are
+              jointly owned and operated sister media companies serving Eastern North Carolina.
+            </span>
           </div>
         </div>
 
@@ -119,27 +123,27 @@ export default function Home() {
             <Store size={15} aria-hidden="true" /> Restaurants &amp; shops
           </div>
           <div className="sales-placement-card sales-placement-two">
-            <MapPin size={15} aria-hidden="true" /> Eastern Carolina
+            <MapPin size={15} aria-hidden="true" /> 75+ locations
           </div>
         </div>
       </section>
 
       <section className="sales-value-strip sales-container" aria-label="Why NeuseCast">
         <article>
-          <strong>Local</strong>
-          <span>Designed for Eastern Carolina businesses and customers.</span>
+          <strong>75+ locations</strong>
+          <span>Deployed throughout Eastern North Carolina.</span>
         </article>
         <article>
-          <strong>12 plays daily</strong>
-          <span>Per active screen, paced through the broadcast day.</span>
+          <strong>12 verified plays</strong>
+          <span>Per active, compatible screen each broadcast day.</span>
         </article>
         <article>
-          <strong>Flexible</strong>
-          <span>Update offers, events, and seasonal promotions remotely.</span>
+          <strong>Fast updates</strong>
+          <span>Refresh offers, events, and seasonal messages remotely.</span>
         </article>
         <article>
             <strong>$75/month</strong>
-          <span>One transparent price. Every active NeuseCast screen.</span>
+          <span>One transparent all-screen plan.</span>
         </article>
       </section>
 
@@ -151,8 +155,8 @@ export default function Home() {
           </div>
           <p>
             NeuseCast combines the visibility of out-of-home advertising with the
-            flexibility of digital media—built specifically for businesses serving
-            Eastern North Carolina.
+            speed and flexibility of digital media across more than 75 deployed
+            locations throughout Eastern North Carolina.
           </p>
         </div>
 
@@ -173,10 +177,10 @@ export default function Home() {
 
       <section className="sales-pricing sales-container" id="pricing">
         <div className="sales-pricing-copy">
-          <div className="eyebrow">Transparent founding rate</div>
-          <h2>Every screen. 12 daily plays. $75 a month.</h2>
+          <div className="eyebrow">Simple, transparent pricing</div>
+          <h2>Every active screen. 12 verified plays. $75 a month.</h2>
           <p>No quote request, confusing package, or surprise screen fee. Build and preview your campaign online, then subscribe securely while your message is fresh.</p>
-          <ul><li><Check size={16} aria-hidden="true" /> 12 verified plays per active screen, per day</li><li><Check size={16} aria-hidden="true" /> Screen-ready creative and revisions</li><li><Check size={16} aria-hidden="true" /> Proof-of-play reporting</li><li><Check size={16} aria-hidden="true" /> Month-to-month; cancel anytime</li></ul>
+          <ul><li><Check size={16} aria-hidden="true" /> 12 verified plays per active, compatible screen each broadcast day</li><li><Check size={16} aria-hidden="true" /> Screen-ready creative and revisions</li><li><Check size={16} aria-hidden="true" /> Proof-of-play reporting</li><li><Check size={16} aria-hidden="true" /> Month-to-month; cancel anytime</li></ul>
         </div>
         <div className="sales-price-card">
           <span>ALL-SCREEN PLAN</span>
@@ -252,24 +256,25 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="sales-launch sales-container" id="launch">
+      <section className="sales-launch sales-container" id="network">
         <div className="sales-launch-mark" aria-hidden="true">
           <Layers3 size={30} />
         </div>
         <div>
-          <div className="eyebrow">The founding network</div>
-          <h2>Help build Eastern Carolina&apos;s local screen network.</h2>
+          <div className="eyebrow">Established regional reach</div>
+          <h2>Deployed in 75+ locations across Eastern North Carolina.</h2>
           <p>
-            NeuseCast is preparing its first host locations and advertiser roster in
-            and around New Bern. Founding advertisers can lock in the simple $75 all-screen
-            plan, while founding hosts receive priority installation review.
+            NeuseCast screens are installed in the restaurants, shops, waiting rooms,
+            gyms, and community businesses people visit every day. Approved campaigns
+            run across every active, compatible screen, with verified proof-of-play
+            reporting included.
           </p>
         </div>
         <div className="sales-launch-actions">
           <Link className="button button-primary" href="/advertiser/new">
             Build a $75 campaign <ArrowRight size={17} aria-hidden="true" />
           </Link>
-          <a className="button button-secondary" href="#hosts">Become a founding host</a>
+          <a className="button button-secondary" href="#hosts">Host a NeuseCast screen</a>
         </div>
       </section>
 
@@ -293,7 +298,7 @@ export default function Home() {
           </details>
           <details>
             <summary>Where will my campaign appear?<ChevronRight size={17} aria-hidden="true" /></summary>
-            <p>The founding $75/month plan includes 12 verified plays per day on every active, compatible screen in the NeuseCast network.</p>
+            <p>The $75/month all-screen plan includes 12 verified plays per broadcast day on every active, compatible NeuseCast screen, subject to venue restrictions and network availability.</p>
           </details>
         </div>
       </section>
@@ -319,7 +324,7 @@ export default function Home() {
             <a href={`mailto:${NEUSECAST_CONTACT.email}`}>{NEUSECAST_CONTACT.email}</a>
             <a href={`tel:${NEUSECAST_CONTACT.phoneHref}`}>{NEUSECAST_CONTACT.phone}</a>
             <address>{NEUSECAST_CONTACT.addressLine1}<br />{NEUSECAST_CONTACT.addressLine2}</address>
-            <span><Building2 size={14} aria-hidden="true" /> A Persa Labs company</span>
+            <span><Building2 size={14} aria-hidden="true" /> Jointly owned and operated with Captain 97.1</span>
           </div>
         </div>
       </footer>

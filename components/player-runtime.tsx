@@ -1,13 +1,30 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, CloudSun, History, Lightbulb, MapPin, Radio, Store, Waves } from "lucide-react";
+import type { CSSProperties } from "react";
+import {
+  CalendarDays,
+  CloudLightning,
+  CloudRain,
+  CloudSnow,
+  CloudSun,
+  History,
+  Lightbulb,
+  MapPin,
+  Newspaper,
+  Radio,
+  Store,
+  Sun,
+  Waves,
+  Wind,
+} from "lucide-react";
 import type { PlayerItem, PlayerManifest } from "@/lib/player/types";
 
 const kindLabels: Record<PlayerItem["kind"], string> = {
   advertisement: "Local business",
   host: "At this location",
   weather: "Local weather",
+  news: "Local news",
   event: "Around town",
   history: "Local history",
   trivia: "Quick trivia",
@@ -16,11 +33,64 @@ const kindLabels: Record<PlayerItem["kind"], string> = {
 
 function KindIcon({ kind }: { kind: PlayerItem["kind"] }) {
   if (kind === "weather") return <CloudSun />;
+  if (kind === "news") return <Newspaper />;
   if (kind === "history") return <History />;
   if (kind === "trivia") return <Lightbulb />;
   if (kind === "event") return <CalendarDays />;
   if (kind === "host") return <Store />;
   return <Radio />;
+}
+
+function extractTemperature(value: string) {
+  const degreeValue = value.match(/(-?\d{1,3})\s*°(?:\s*f)?/iu)?.[1];
+  if (degreeValue) return `${degreeValue}°`;
+  const forecastValue = value.match(/\b(?:high|low|near|around)\s+(?:near\s+|around\s+|of\s+)?(-?\d{1,3})\b/iu)?.[1];
+  return forecastValue ? `${forecastValue}°` : null;
+}
+
+function ForecastIcon({ forecast }: { forecast: string }) {
+  const normalized = forecast.toLowerCase();
+  if (/thunder|lightning|storm/u.test(normalized)) return <CloudLightning />;
+  if (/snow|sleet|flurr/u.test(normalized)) return <CloudSnow />;
+  if (/rain|shower|drizzle/u.test(normalized)) return <CloudRain />;
+  if (/wind|breez|gust/u.test(normalized)) return <Wind />;
+  if (/sunny|clear/u.test(normalized)) return <Sun />;
+  return <CloudSun />;
+}
+
+function WeatherVisual({ item, location }: { item: PlayerItem; location: string }) {
+  const forecast = `${item.title} ${item.body}`;
+  const temperature = extractTemperature(forecast);
+
+  return (
+    <div className="player-weather-panel">
+      <div className="player-weather-scene">
+        <span className="player-weather-sun" />
+        <span className="player-weather-cloud"><ForecastIcon forecast={forecast} /></span>
+        <span className="player-weather-wind player-weather-wind-one" />
+        <span className="player-weather-wind player-weather-wind-two" />
+      </div>
+      <div className="player-weather-reading">
+        <strong>{temperature ?? "Forecast"}</strong>
+        <span>{location}</span>
+      </div>
+      <div className="player-weather-meta">
+        <span>Local outlook</span>
+        <span>Updated automatically</span>
+      </div>
+    </div>
+  );
+}
+
+function NewsSignal() {
+  return (
+    <div className="player-news-signal">
+      <span className="player-news-signal-ring player-news-signal-ring-one" />
+      <span className="player-news-signal-ring player-news-signal-ring-two" />
+      <span className="player-news-signal-ring player-news-signal-ring-three" />
+      <Newspaper />
+    </div>
+  );
 }
 
 function PlayerProgress({ durationSeconds }: { durationSeconds: number }) {
@@ -334,6 +404,14 @@ export function PlayerRuntime({
   }), [manifest.items, manifest.version, playedAdvertisements, preview, serverNowMs]);
   const displayedIndex = activeIndex < playableItems.length ? activeIndex : 0;
   const currentItem = playableItems[displayedIndex] ?? null;
+  const isNews = currentItem?.kind === "news";
+  const isWeather = currentItem?.kind === "weather";
+  const hasMedia = Boolean(currentItem?.mediaUrl);
+  const isEditorialPhoto = Boolean(
+    currentItem?.source === "generated_content"
+    && currentItem.mediaUrl
+    && ["did_you_know", "fact", "history", "on_this_day"].includes(currentItem.contentCategory ?? ""),
+  );
 
   const location = useMemo(
     () => `${manifest.venue.city}, ${manifest.venue.state}`,
@@ -740,8 +818,15 @@ export function PlayerRuntime({
     );
   }
 
+  const playerStyle = {
+    "--player-slide-duration": `${currentItem.durationSeconds}s`,
+  } as CSSProperties;
+
   return (
-    <main className={`player-stage player-theme-${currentItem.theme}`}>
+    <main
+      className={`player-stage player-theme-${currentItem.theme} player-kind-${currentItem.kind}${hasMedia ? " player-has-media" : ""}${isEditorialPhoto ? " player-editorial-photo" : ""}`}
+      style={playerStyle}
+    >
       <div className="player-orbit player-orbit-one" aria-hidden="true" />
       <div className="player-orbit player-orbit-two" aria-hidden="true" />
 
@@ -757,8 +842,9 @@ export function PlayerRuntime({
         </div>
       </header>
 
-      <section className="player-slide" key={currentItem.id}>
+      <section className={`player-slide player-slide-${currentItem.kind}`} key={currentItem.id}>
         <div className="player-copy">
+          {isNews ? <div className="player-news-strap"><span>NeuseCast Newsroom</span> Local update</div> : null}
           <div className="player-eyebrow">
             <KindIcon kind={currentItem.kind} />
             {currentItem.eyebrow || kindLabels[currentItem.kind]}
@@ -769,11 +855,34 @@ export function PlayerRuntime({
         </div>
 
         <div className="player-visual" aria-hidden="true">
-          {currentItem.mediaUrl
-            ? <div className="player-visual-artwork" style={{ backgroundImage: `url(${JSON.stringify(currentItem.mediaUrl)})` }} />
-            : <div className="player-visual-ring"><KindIcon kind={currentItem.kind} /></div>}
+          {isWeather
+            ? <WeatherVisual item={currentItem} location={location} />
+            : currentItem.mediaUrl
+              ? (
+                <div className="player-visual-artwork">
+                  <div
+                    className="player-visual-artwork-image"
+                    style={{ backgroundImage: `url(${JSON.stringify(currentItem.mediaUrl)})` }}
+                  />
+                  <div className="player-visual-artwork-shade" />
+                </div>
+              )
+              : isNews
+                ? <NewsSignal />
+                : <div className="player-visual-ring"><KindIcon kind={currentItem.kind} /></div>}
           <span>{currentItem.sponsor ?? kindLabels[currentItem.kind]}</span>
+          {currentItem.mediaCredit ? <small className="player-media-credit">{currentItem.mediaCredit}</small> : null}
         </div>
+
+        {isNews ? (
+          <div className="player-news-ticker" aria-hidden="true">
+            <strong>LOCAL UPDATE</strong>
+            <div>
+              <span>{currentItem.title} &nbsp; • &nbsp; {currentItem.body} &nbsp; • &nbsp; Source: {currentItem.sponsor ?? "NeuseCast Newsroom"}</span>
+              <span>{currentItem.title} &nbsp; • &nbsp; {currentItem.body} &nbsp; • &nbsp; Source: {currentItem.sponsor ?? "NeuseCast Newsroom"}</span>
+            </div>
+          </div>
+        ) : null}
       </section>
 
       <footer className="player-footer">

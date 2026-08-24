@@ -1,4 +1,4 @@
-export type PlayerItemKind = "advertisement" | "host" | "weather" | "event" | "history" | "trivia" | "community";
+export type PlayerItemKind = "advertisement" | "host" | "weather" | "news" | "event" | "history" | "trivia" | "community";
 
 export type PlayerTheme = "aqua" | "navy" | "coral" | "gold" | "blue" | "green";
 
@@ -16,6 +16,8 @@ export type PlayerItem = {
   mediaUrl: string | null;
   theme: PlayerTheme;
   sponsor: string | null;
+  contentCategory?: string | null;
+  mediaCredit?: string | null;
   expiresAt?: string | null;
 };
 

@@ -21,7 +21,7 @@ import { NEUSECAST_HOUSE_AD } from "./house-ad";
 import { broadcastDayWindow } from "@/lib/time-zone";
 
 const THEMES = new Set<PlayerTheme>(["aqua", "navy", "coral", "gold", "blue", "green"]);
-const KINDS = new Set<PlayerItemKind>(["advertisement", "host", "weather", "event", "history", "trivia", "community"]);
+const KINDS = new Set<PlayerItemKind>(["advertisement", "host", "weather", "news", "event", "history", "trivia", "community"]);
 const HOST_THEMES: Record<string, PlayerTheme> = { special: "coral", event: "aqua", announcement: "blue", menu: "gold" };
 
 function metadataString(metadata: Record<string, unknown> | null, key: string) {
@@ -37,7 +37,6 @@ function resolveTheme(metadata: Record<string, unknown> | null, fallback: Player
 function resolveKind(category: string): PlayerItemKind {
   if (category === "did_you_know" || category === "fact") return "trivia";
   if (category === "on_this_day") return "history";
-  if (category === "news") return "community";
   return KINDS.has(category as PlayerItemKind) ? (category as PlayerItemKind) : "community";
 }
 
@@ -263,6 +262,8 @@ export async function getPlayerManifest(
     mediaUrl: row.mediaUrl,
     theme: resolveTheme(row.metadata, "coral"),
     sponsor: metadataString(row.metadata, "sponsor"),
+    contentCategory: null,
+    mediaCredit: metadataString(row.metadata, "mediaCredit"),
     expiresAt: row.expiresAt?.toISOString() ?? null,
   }));
 
@@ -280,6 +281,7 @@ export async function getPlayerManifest(
     mediaUrl: row.mediaUrl,
     theme: THEMES.has(row.template as PlayerTheme) ? (row.template as PlayerTheme) : HOST_THEMES[row.template] ?? "aqua",
     sponsor: screen.venueName,
+    contentCategory: row.template,
     expiresAt: row.expiresAt?.toISOString() ?? null,
   }));
 
@@ -297,6 +299,8 @@ export async function getPlayerManifest(
     mediaUrl: row.artworkUrl,
     theme: resolveTheme(row.metadata, "navy"),
     sponsor: row.sourceName,
+    contentCategory: row.category,
+    mediaCredit: metadataString(row.metadata, "artworkCredit"),
     expiresAt: row.expiresAt?.toISOString() ?? null,
   }));
 
