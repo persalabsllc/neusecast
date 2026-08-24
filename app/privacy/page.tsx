@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { LegalPage } from "@/components/legal-page";
-import { LEGAL_CONTACT_EMAIL } from "@/lib/legal";
+import { NEUSECAST_CONTACT } from "@/lib/legal";
 
 export const metadata: Metadata = { title: "Privacy Policy" };
 
@@ -12,7 +12,7 @@ export default function PrivacyPage() {
       <section><h2>Service providers</h2><p>We share information only as needed with providers that support the service, including Clerk for authentication, Stripe for billing, Vercel for application hosting, and database and communications providers. We may also disclose information when required by law or to protect rights and safety.</p></section>
       <section><h2>Retention and security</h2><p>We retain information while an account is active and as reasonably needed for billing, delivery records, security, legal obligations, and dispute resolution. We use reasonable administrative and technical safeguards, but no online system can promise absolute security.</p></section>
       <section><h2>Your choices</h2><p>You may update account and campaign information in your workspace. You may request access, correction, or deletion of personal information, subject to records we must retain for legal or operational reasons.</p></section>
-      <section><h2>Contact</h2><p>Privacy requests may be sent to <a href={`mailto:${LEGAL_CONTACT_EMAIL}`}>{LEGAL_CONTACT_EMAIL}</a>.</p></section>
+      <section><h2>Contact</h2><p>Privacy requests may be sent to <a href={`mailto:${NEUSECAST_CONTACT.email}`}>{NEUSECAST_CONTACT.email}</a>, directed to <a href={`tel:${NEUSECAST_CONTACT.phoneHref}`}>{NEUSECAST_CONTACT.phone}</a>, or mailed to {NEUSECAST_CONTACT.addressLine1}, {NEUSECAST_CONTACT.addressLine2}.</p></section>
     </LegalPage>
   );
 }

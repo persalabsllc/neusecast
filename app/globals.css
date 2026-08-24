@@ -1056,7 +1056,8 @@ textarea:focus-visible {
   gap: 20px;
 }
 
-.sales-footer-company {
+.sales-footer-company,
+.sales-footer-contact {
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -1064,6 +1065,18 @@ textarea:focus-visible {
   color: var(--muted);
   font-size: 10px;
 }
+
+.sales-footer-contact {
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  text-align: right;
+}
+
+.sales-footer-contact a { color: var(--paper-soft); text-decoration: none; }
+.sales-footer-contact a:hover { color: var(--tide); }
+.sales-footer-contact address { color: var(--muted); font-style: normal; line-height: 1.55; }
+.sales-footer-contact span { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
 
 /* Host workspace */
 .host-page {
@@ -3844,6 +3857,14 @@ textarea:focus-visible {
 .legal-document p { margin: 0; color: var(--muted-bright); font-size: 13px; line-height: 1.75; }
 .legal-document a { color: var(--tide); }
 .legal-links { width: min(760px, 100%); display: flex; flex-wrap: wrap; gap: 22px; margin: 38px auto 0; padding-top: 24px; border-top: 1px solid var(--line); }
+.contact-intro { max-width: 650px; margin: 0 0 34px; color: var(--muted-bright); font-size: 15px; line-height: 1.7; }
+.contact-card-grid { display: grid; gap: 14px; }
+.contact-card { display: grid; grid-template-columns: 42px 1fr; align-items: center; gap: 13px; padding: 20px; border: 1px solid var(--line); border-radius: 15px; background: rgba(12, 29, 35, 0.72); color: var(--paper); font-style: normal; text-decoration: none; }
+.contact-card svg { color: var(--tide); }
+.contact-card span { display: grid; gap: 4px; }
+.contact-card small { color: var(--muted); font-size: 9px; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
+.contact-card strong { color: var(--paper); font-size: 13px; line-height: 1.55; }
+a.contact-card:hover { border-color: rgba(67, 221, 193, 0.35); background: rgba(67, 221, 193, 0.06); }
 
 .creative-preview-panel {
   position: sticky;
@@ -4385,10 +4406,13 @@ textarea:focus-visible {
     justify-content: flex-end;
   }
 
-  .sales-footer-company {
+  .sales-footer-company,
+  .sales-footer-contact {
     grid-column: 1 / -1;
+    align-items: flex-start;
     justify-content: flex-start;
     padding-bottom: 35px;
+    text-align: left;
   }
 }
 
@@ -4520,8 +4544,11 @@ textarea:focus-visible {
     justify-content: flex-start;
   }
 
-  .sales-footer-company {
+  .sales-footer-company,
+  .sales-footer-contact {
     grid-column: auto;
+    align-items: flex-start;
+    text-align: left;
   }
 }
 

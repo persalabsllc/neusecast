@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { LegalPage } from "@/components/legal-page";
-import { LEGAL_CONTACT_EMAIL } from "@/lib/legal";
+import { NEUSECAST_CONTACT } from "@/lib/legal";
 
 export const metadata: Metadata = { title: "Terms of Service" };
 
@@ -13,7 +13,7 @@ export default function TermsPage() {
       <section><h2>Availability and changes</h2><p>We work to keep screens and online services available, but internet, venue, hardware, maintenance, and third-party outages can interrupt service. We may improve or change features while preserving the core value of an active paid plan.</p></section>
       <section><h2>Acceptable use</h2><p>You may not misuse the service, interfere with its operation, attempt unauthorized access, or submit unlawful, deceptive, infringing, hateful, or harmful material. We may suspend access or content that violates these terms or creates risk for viewers, venues, or the network.</p></section>
       <section><h2>Disclaimers and liability</h2><p>NeuseCast does not guarantee sales, leads, or other business outcomes. To the fullest extent permitted by law, the service is provided as available and NeuseCast is not liable for indirect, incidental, special, or consequential damages. Our aggregate liability for a claim is limited to the amount you paid NeuseCast during the three months before the event giving rise to it.</p></section>
-      <section><h2>Contact</h2><p>Questions about these terms may be sent to <a href={`mailto:${LEGAL_CONTACT_EMAIL}`}>{LEGAL_CONTACT_EMAIL}</a>.</p></section>
+      <section><h2>Contact</h2><p>Questions about these terms may be sent to <a href={`mailto:${NEUSECAST_CONTACT.email}`}>{NEUSECAST_CONTACT.email}</a>, directed to <a href={`tel:${NEUSECAST_CONTACT.phoneHref}`}>{NEUSECAST_CONTACT.phone}</a>, or mailed to {NEUSECAST_CONTACT.addressLine1}, {NEUSECAST_CONTACT.addressLine2}.</p></section>
     </LegalPage>
   );
 }

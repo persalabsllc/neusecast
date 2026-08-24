@@ -17,6 +17,7 @@ import {
   Target,
 } from "lucide-react";
 import { Brand } from "@/components/brand";
+import { NEUSECAST_CONTACT } from "@/lib/legal";
 
 export const metadata: Metadata = {
   title: "Advertise Across Eastern Carolina",
@@ -68,6 +69,7 @@ export default function Home() {
             <a href="#how-it-works">How it works</a>
             <a href="#hosts">Host a screen</a>
             <a href="#launch">Launch market</a>
+            <Link href="/contact">Contact</Link>
           </div>
 
           <div className="sales-login-links">
@@ -323,9 +325,13 @@ export default function Home() {
             <Link href="/terms">Terms</Link>
             <Link href="/advertising-terms">Advertising terms</Link>
             <Link href="/privacy">Privacy</Link>
+            <Link href="/contact">Contact</Link>
           </div>
-          <div className="sales-footer-company">
-            <Building2 size={16} aria-hidden="true" /> A Persa Labs company
+          <div className="sales-footer-contact">
+            <a href={`mailto:${NEUSECAST_CONTACT.email}`}>{NEUSECAST_CONTACT.email}</a>
+            <a href={`tel:${NEUSECAST_CONTACT.phoneHref}`}>{NEUSECAST_CONTACT.phone}</a>
+            <address>{NEUSECAST_CONTACT.addressLine1}<br />{NEUSECAST_CONTACT.addressLine2}</address>
+            <span><Building2 size={14} aria-hidden="true" /> A Persa Labs company</span>
           </div>
         </div>
       </footer>

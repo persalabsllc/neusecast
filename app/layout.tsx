@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Geist, Geist_Mono } from "next/font/google";
+import { NEUSECAST_CONTACT } from "@/lib/legal";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -12,6 +13,22 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
+
+const organizationSchema = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: "NeuseCast",
+  email: NEUSECAST_CONTACT.email,
+  telephone: NEUSECAST_CONTACT.phoneHref,
+  address: {
+    "@type": "PostalAddress",
+    streetAddress: NEUSECAST_CONTACT.addressLine1,
+    addressLocality: "New Bern",
+    addressRegion: "NC",
+    postalCode: "28562",
+    addressCountry: "US",
+  },
+}).replaceAll("<", "\\u003c");
 
 export const metadata: Metadata = {
   title: {
@@ -28,6 +45,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: organizationSchema }} />
         <ClerkProvider
           afterSignOutUrl="/"
           appearance={{

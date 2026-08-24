@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { LegalPage } from "@/components/legal-page";
-import { LEGAL_CONTACT_EMAIL } from "@/lib/legal";
+import { NEUSECAST_CONTACT } from "@/lib/legal";
 
 export const metadata: Metadata = { title: "Advertising Terms" };
 
@@ -13,7 +13,7 @@ export default function AdvertisingTermsPage() {
       <section><h2>Review and venue suitability</h2><p>All creative is subject to review for clarity, accuracy, legal compliance, quality, and venue suitability. A host may restrict direct competitors or categories inappropriate for its location. We may request substantiation, revise formatting with your approval, reject content, or pause a campaign that no longer complies.</p></section>
       <section><h2>Advertiser responsibility</h2><p>You are responsible for accurate prices, dates, disclosures, availability, licenses, and claims. Offers must be honored as presented. Advertising may not promote illegal products or services, contain misleading claims, infringe third-party rights, or target viewers in a discriminatory or harmful manner.</p></section>
       <section><h2>No performance guarantee</h2><p>Proof of play confirms that a creative completed playback on a NeuseCast screen; it does not measure who saw the screen or guarantee impressions, visits, calls, sales, or any other outcome.</p></section>
-      <section><h2>Questions</h2><p>Delivery or policy questions may be sent to <a href={`mailto:${LEGAL_CONTACT_EMAIL}`}>{LEGAL_CONTACT_EMAIL}</a>.</p></section>
+      <section><h2>Questions</h2><p>Delivery or policy questions may be sent to <a href={`mailto:${NEUSECAST_CONTACT.email}`}>{NEUSECAST_CONTACT.email}</a>, directed to <a href={`tel:${NEUSECAST_CONTACT.phoneHref}`}>{NEUSECAST_CONTACT.phone}</a>, or mailed to {NEUSECAST_CONTACT.addressLine1}, {NEUSECAST_CONTACT.addressLine2}.</p></section>
     </LegalPage>
   );
 }
