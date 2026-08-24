@@ -3,6 +3,11 @@ import { neon } from "@neondatabase/serverless";
 import { readMigrationFiles } from "drizzle-orm/migrator";
 
 const databaseUrl = process.env.DATABASE_URL;
+// Migrations 0000-0004 were applied by Drizzle's timestamp-only runner, and
+// some of those legacy files were later intentionally normalized. Preserve
+// that established production baseline; migration 0005 and every subsequent
+// migration must match its recorded hash exactly.
+const STRICT_MIGRATION_HASH_FROM_MILLIS = 1787601972302;
 
 if (!databaseUrl && process.env.VERCEL === "1" && process.env.VERCEL_ENV === "production") {
   throw new Error("DATABASE_URL is required for a production deployment.");
@@ -68,6 +73,12 @@ if (!databaseUrl && process.env.VERCEL === "1" && process.env.VERCEL_ENV === "pr
       const appliedHash = appliedByTimestamp.get(migration.folderMillis);
       if (appliedHash === migration.hash) continue;
       if (appliedHash) {
+        if (migration.folderMillis < STRICT_MIGRATION_HASH_FROM_MILLIS) {
+          console.warn(
+            `Skipping legacy migration ${migration.folderMillis} with its previously recorded hash.`,
+          );
+          continue;
+        }
         throw new Error(`Migration ${migration.folderMillis} was already recorded with a different hash.`);
       }
 
