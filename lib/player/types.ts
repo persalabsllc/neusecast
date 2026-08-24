@@ -2,6 +2,28 @@ export type PlayerItemKind = "advertisement" | "host" | "weather" | "news" | "ev
 
 export type PlayerTheme = "aqua" | "navy" | "coral" | "gold" | "blue" | "green";
 
+export type PlayerWeatherPeriod = {
+  name: string;
+  temperature: number;
+  temperatureUnit: "F" | "C";
+  shortForecast: string;
+  windSpeed: string;
+  windDirection: string;
+  precipitationChance: number | null;
+  isDaytime: boolean;
+  startsAt: string;
+  endsAt: string;
+};
+
+export type PlayerAlert = {
+  id: string;
+  event: string;
+  headline: string;
+  area: string;
+  severity: string;
+  expiresAt: string | null;
+};
+
 export type PlayerItem = {
   id: string;
   kind: PlayerItemKind;
@@ -18,6 +40,7 @@ export type PlayerItem = {
   sponsor: string | null;
   contentCategory?: string | null;
   mediaCredit?: string | null;
+  weatherPeriods?: PlayerWeatherPeriod[];
   expiresAt?: string | null;
 };
 
@@ -38,5 +61,6 @@ export type PlayerManifest = {
     market: string;
     timeZone: string;
   };
+  alerts?: PlayerAlert[];
   items: PlayerItem[];
 };

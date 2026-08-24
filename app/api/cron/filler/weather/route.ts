@@ -1,4 +1,4 @@
-import { generateAutomaticFiller } from "@/lib/filler/generator";
+import { getRegionalAlerts, getRegionalForecast } from "@/lib/player/weather";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -9,12 +9,23 @@ export async function GET(request: Request) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const result = await generateAutomaticFiller(undefined, ["weather"]);
-  if (result.errors.length) {
-    console.error("Scheduled NeuseCast weather refresh completed with errors", result.errors);
+  try {
+    const [forecast, alerts] = await Promise.all([
+      getRegionalForecast(),
+      getRegionalAlerts(),
+    ]);
+    return Response.json({
+      ok: true,
+      provider: "National Weather Service",
+      forecastPeriods: forecast.periods.length,
+      activeWarnings: alerts.length,
+      updatedAt: forecast.updatedAt,
+    });
+  } catch (error) {
+    console.error("Scheduled NeuseCast NWS refresh failed", error);
+    return Response.json({
+      ok: false,
+      error: error instanceof Error ? error.message : "Weather refresh failed.",
+    }, { status: 502 });
   }
-  return Response.json({
-    ok: result.errors.length === 0,
-    ...result,
-  }, { status: result.errors.length ? 502 : 200 });
 }

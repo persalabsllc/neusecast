@@ -15,6 +15,7 @@ import {
   Radio,
   Store,
   Sun,
+  TriangleAlert,
   Waves,
   Wind,
 } from "lucide-react";
@@ -60,7 +61,11 @@ function ForecastIcon({ forecast }: { forecast: string }) {
 
 function WeatherVisual({ item, location }: { item: PlayerItem; location: string }) {
   const forecast = `${item.title} ${item.body}`;
-  const temperature = extractTemperature(forecast);
+  const periods = item.weatherPeriods ?? [];
+  const currentPeriod = periods[0];
+  const temperature = currentPeriod
+    ? `${currentPeriod.temperature}°`
+    : extractTemperature(forecast);
 
   return (
     <div className="player-weather-panel">
@@ -74,9 +79,21 @@ function WeatherVisual({ item, location }: { item: PlayerItem; location: string 
         <strong>{temperature ?? "Forecast"}</strong>
         <span>{location}</span>
       </div>
+      {periods.length ? (
+        <div className="player-weather-periods">
+          {periods.map((period) => (
+            <div key={`${period.name}:${period.startsAt}`}>
+              <span><ForecastIcon forecast={period.shortForecast} /></span>
+              <small>{period.name}</small>
+              <strong>{period.temperature}°</strong>
+              <em>{period.precipitationChance === null ? period.shortForecast : `${period.precipitationChance}% rain`}</em>
+            </div>
+          ))}
+        </div>
+      ) : null}
       <div className="player-weather-meta">
-        <span>Local outlook</span>
-        <span>Updated automatically</span>
+        <span>National Weather Service</span>
+        <span>Live regional outlook</span>
       </div>
     </div>
   );
@@ -412,6 +429,11 @@ export function PlayerRuntime({
     && currentItem.mediaUrl
     && ["did_you_know", "fact", "history", "on_this_day"].includes(currentItem.contentCategory ?? ""),
   );
+  const activeAlerts = useMemo(() => (manifest.alerts ?? []).filter((alert) => {
+    if (!alert.expiresAt) return true;
+    const expiresAt = Date.parse(alert.expiresAt);
+    return Number.isFinite(expiresAt) && expiresAt > serverNowMs;
+  }), [manifest.alerts, serverNowMs]);
 
   const location = useMemo(
     () => `${manifest.venue.city}, ${manifest.venue.state}`,
@@ -824,7 +846,7 @@ export function PlayerRuntime({
 
   return (
     <main
-      className={`player-stage player-theme-${currentItem.theme} player-kind-${currentItem.kind}${hasMedia ? " player-has-media" : ""}${isEditorialPhoto ? " player-editorial-photo" : ""}`}
+      className={`player-stage player-theme-${currentItem.theme} player-kind-${currentItem.kind}${hasMedia ? " player-has-media" : ""}${isEditorialPhoto ? " player-editorial-photo" : ""}${activeAlerts.length ? " player-has-alert" : ""}`}
       style={playerStyle}
     >
       <div className="player-orbit player-orbit-one" aria-hidden="true" />
@@ -856,7 +878,7 @@ export function PlayerRuntime({
 
         <div className="player-visual" aria-hidden="true">
           {isWeather
-            ? <WeatherVisual item={currentItem} location={location} />
+            ? <WeatherVisual item={currentItem} location="Eastern North Carolina" />
             : currentItem.mediaUrl
               ? (
                 <div className="player-visual-artwork">
@@ -884,6 +906,19 @@ export function PlayerRuntime({
           </div>
         ) : null}
       </section>
+
+      {activeAlerts.length ? (
+        <div className="player-alert-ticker" role="status" aria-live="polite">
+          <strong><TriangleAlert aria-hidden="true" /> Weather warning</strong>
+          <div>
+            {[...activeAlerts, ...activeAlerts].map((alert, index) => (
+              <span key={`${alert.id}:${index}`}>
+                <b>{alert.event}</b> — {alert.headline} — {alert.area}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <footer className="player-footer">
         <span>{manifest.venue.name}</span>

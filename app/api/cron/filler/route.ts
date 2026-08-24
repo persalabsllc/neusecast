@@ -1,4 +1,5 @@
 import { generateAutomaticFiller } from "@/lib/filler/generator";
+import { FILLER_CATEGORIES } from "@/lib/filler/constants";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -9,7 +10,10 @@ export async function GET(request: Request) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const result = await generateAutomaticFiller();
+  const result = await generateAutomaticFiller(
+    undefined,
+    FILLER_CATEGORIES.filter((category) => category !== "weather"),
+  );
   if (result.errors.length) {
     console.error("Scheduled NeuseCast filler refresh completed with errors", result.errors);
   }

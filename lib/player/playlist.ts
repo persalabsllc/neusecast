@@ -19,6 +19,7 @@ import { selectBalancedFiller } from "@/lib/filler/selection";
 import type { PlayerItem, PlayerItemKind, PlayerManifest, PlayerTheme } from "./types";
 import { NEUSECAST_HOUSE_AD } from "./house-ad";
 import { broadcastDayWindow } from "@/lib/time-zone";
+import { getRegionalAlerts, getRegionalForecast, regionalWeatherItem } from "./weather";
 
 const THEMES = new Set<PlayerTheme>(["aqua", "navy", "coral", "gold", "blue", "green"]);
 const KINDS = new Set<PlayerItemKind>(["advertisement", "host", "weather", "news", "event", "history", "trivia", "community"]);
@@ -105,6 +106,14 @@ export async function getPlayerManifest(
   await ensureScreenManagementSchema();
   const database = getDatabase();
   const now = new Date();
+  const regionalForecastPromise = getRegionalForecast().catch((error) => {
+    console.error("NeuseCast could not refresh the regional NWS forecast", error);
+    return null;
+  });
+  const regionalAlertsPromise = getRegionalAlerts().catch((error) => {
+    console.error("NeuseCast could not refresh regional NWS alerts", error);
+    return [];
+  });
 
   const [screen] = await database
     .select({
@@ -131,7 +140,7 @@ export async function getPlayerManifest(
 
   const broadcastDay = broadcastDayWindow(now, screen.timeZone);
 
-  const [creativeRows, hostRows, generatedRows, blockedRows, playbackRows] = await Promise.all([
+  const [creativeRows, hostRows, generatedRows, blockedRows, playbackRows, regionalForecast, regionalAlerts] = await Promise.all([
     database
       .selectDistinct({
         id: creatives.id,
@@ -225,6 +234,8 @@ export async function getPlayerManifest(
         lte(playbackEvents.playedAt, now),
       ))
       .groupBy(playbackEvents.campaignId),
+    regionalForecastPromise,
+    regionalAlertsPromise,
   ]);
 
   const blockedAdvertisers = new Set(blockedRows.map((row) => row.advertiserAccountId));
@@ -285,7 +296,10 @@ export async function getPlayerManifest(
     expiresAt: row.expiresAt?.toISOString() ?? null,
   }));
 
-  const fillerItems: PlayerItem[] = selectBalancedFiller(generatedRows).map((row) => ({
+  const eligibleGeneratedRows = regionalForecast
+    ? generatedRows.filter((row) => row.category !== "weather")
+    : generatedRows;
+  const fillerItems: PlayerItem[] = selectBalancedFiller(eligibleGeneratedRows).map((row) => ({
     id: row.id,
     kind: resolveKind(row.category),
     source: "generated_content",
@@ -303,12 +317,14 @@ export async function getPlayerManifest(
     mediaCredit: metadataString(row.metadata, "artworkCredit"),
     expiresAt: row.expiresAt?.toISOString() ?? null,
   }));
+  if (regionalForecast) fillerItems.unshift(regionalWeatherItem(regionalForecast));
 
   const items = interleaveRotation(advertisements, hostItems, fillerItems);
   const version = createHash("sha256")
     .update(JSON.stringify({
       screen: { id: screen.id, orientation: screen.orientation },
       venue: { id: screen.venueId, timeZone: screen.timeZone },
+      alerts: regionalAlerts,
       items,
     }))
     .digest("hex")
@@ -327,6 +343,7 @@ export async function getPlayerManifest(
       market: screen.market,
       timeZone: screen.timeZone,
     },
+    alerts: regionalAlerts,
     items,
   };
 }

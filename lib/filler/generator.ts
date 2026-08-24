@@ -10,6 +10,7 @@ import {
   type FillerCategory,
   type FillerTheme,
 } from "./constants";
+import { findEditorialArtwork, type EditorialArtwork } from "./artwork";
 
 type GeneratedFillerItem = {
   category: FillerCategory;
@@ -22,6 +23,8 @@ type GeneratedFillerItem = {
   theme: FillerTheme;
   durationSeconds: number;
   validUntil: string | null;
+  artworkSearchQuery: string | null;
+  artwork: EditorialArtwork | null;
 };
 
 type OpenAIResponse = {
@@ -65,6 +68,7 @@ function fillerResponseSchema(categories: readonly FillerCategory[]) {
             theme: { type: "string", enum: FILLER_THEMES },
             durationSeconds: { type: "integer", minimum: 8, maximum: 20 },
             validUntil: { type: ["string", "null"], maxLength: 40 },
+            artworkSearchQuery: { type: ["string", "null"], maxLength: 120 },
           },
           required: [
             "category",
@@ -77,6 +81,7 @@ function fillerResponseSchema(categories: readonly FillerCategory[]) {
             "theme",
             "durationSeconds",
             "validUntil",
+            "artworkSearchQuery",
           ],
           additionalProperties: false,
         },
@@ -173,6 +178,8 @@ function validateItems(
       theme: item.theme as FillerTheme,
       durationSeconds: Number.isFinite(duration) ? Math.max(8, Math.min(20, Math.round(duration))) : 12,
       validUntil: boundedText(item.validUntil, 40) || null,
+      artworkSearchQuery: boundedText(item.artworkSearchQuery, 120) || null,
+      artwork: null,
     });
   }
 
@@ -275,6 +282,7 @@ async function requestMarketBatch(market: string, categories: readonly FillerCat
         "Prefer official government, museum, library, tourism, weather, venue, and established local-news sources.",
         "Do not invent events, dates, weather, statistics, quotations, businesses, or URLs.",
         "For an event, use one occurring within the next 14 days and set validUntil to its end time as ISO 8601 with a numeric timezone offset. Set validUntil to null for every other category.",
+        "For did_you_know, history, fact, and on_this_day, provide a short artworkSearchQuery naming the exact person, place, object, or event a relevant archival photograph should depict. Set it to null for other categories.",
         "Write for a television glance: one short headline and no more than two short body sentences.",
         "Return exactly one item in every requested category.",
       ].join(" "),
@@ -304,7 +312,13 @@ async function requestMarketBatch(market: string, categories: readonly FillerCat
   } catch {
     throw new Error("OpenAI returned filler content that could not be parsed.");
   }
-  return validateItems(parsed, citedUrls(payload), categories);
+  const items = validateItems(parsed, citedUrls(payload), categories);
+  return Promise.all(items.map(async (item) => ({
+    ...item,
+    artwork: item.artworkSearchQuery
+      ? await findEditorialArtwork(item.artworkSearchQuery).catch(() => null)
+      : null,
+  })));
 }
 
 async function saveMarketBatch(market: string, items: GeneratedFillerItem[]) {
@@ -316,6 +330,7 @@ async function saveMarketBatch(market: string, items: GeneratedFillerItem[]) {
       category: generatedContent.category,
       approved: generatedContent.approved,
       expiresAt: generatedContent.expiresAt,
+      artworkUrl: generatedContent.artworkUrl,
       metadata: generatedContent.metadata,
     })
     .from(generatedContent)
@@ -347,6 +362,7 @@ async function saveMarketBatch(market: string, items: GeneratedFillerItem[]) {
           body: item.body,
           sourceName: item.sourceName,
           sourceUrl: item.sourceUrl,
+          artworkUrl: item.artwork?.url ?? matching.artworkUrl,
           startsAt: now,
           expiresAt: expiryFor(item, now),
           approved: true,
@@ -361,6 +377,10 @@ async function saveMarketBatch(market: string, items: GeneratedFillerItem[]) {
             durationSeconds: item.durationSeconds,
             generatedAt: now.toISOString(),
             validUntil: item.validUntil,
+            artworkSearchQuery: item.artworkSearchQuery,
+            artworkCredit: item.artwork?.credit ?? matching.metadata?.artworkCredit ?? null,
+            artworkLicense: item.artwork?.license ?? matching.metadata?.artworkLicense ?? null,
+            artworkSourceUrl: item.artwork?.sourceUrl ?? matching.metadata?.artworkSourceUrl ?? null,
           },
           updatedAt: now,
         })
@@ -389,6 +409,7 @@ async function saveMarketBatch(market: string, items: GeneratedFillerItem[]) {
       body: item.body,
       sourceName: item.sourceName,
       sourceUrl: item.sourceUrl,
+      artworkUrl: item.artwork?.url ?? null,
       startsAt: now,
       expiresAt: expiryFor(item, now),
       approved: true,
@@ -402,6 +423,10 @@ async function saveMarketBatch(market: string, items: GeneratedFillerItem[]) {
         durationSeconds: item.durationSeconds,
         generatedAt: now.toISOString(),
         validUntil: item.validUntil,
+        artworkSearchQuery: item.artworkSearchQuery,
+        artworkCredit: item.artwork?.credit ?? null,
+        artworkLicense: item.artwork?.license ?? null,
+        artworkSourceUrl: item.artwork?.sourceUrl ?? null,
       },
     });
     if (previousAutomaticIds.length) {
@@ -420,7 +445,14 @@ async function saveMarketBatch(market: string, items: GeneratedFillerItem[]) {
       category: item.category,
       approved: true,
       expiresAt: expiryFor(item, now),
-      metadata: { origin: "automatic", fingerprint: itemFingerprint },
+      artworkUrl: item.artwork?.url ?? null,
+      metadata: {
+        origin: "automatic",
+        fingerprint: itemFingerprint,
+        artworkCredit: item.artwork?.credit ?? null,
+        artworkLicense: item.artwork?.license ?? null,
+        artworkSourceUrl: item.artwork?.sourceUrl ?? null,
+      },
     });
     created += 1;
   }
