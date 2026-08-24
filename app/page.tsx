@@ -95,7 +95,7 @@ export default function Home() {
           </p>
           <div className="button-row">
             <Link className="button button-primary" href="/advertiser/new">
-              Request launch pricing <ArrowRight size={17} aria-hidden="true" />
+              Build your campaign · $75/mo <ArrowRight size={17} aria-hidden="true" />
             </Link>
             <a className="button button-secondary" href="#how-it-works">
               See how it works
@@ -148,8 +148,8 @@ export default function Home() {
           <span>Update offers, events, and seasonal promotions remotely.</span>
         </article>
         <article>
-          <strong>Clear</strong>
-          <span>Know which screens and dates your campaign includes.</span>
+            <strong>$75/month</strong>
+          <span>One transparent price. Every active NeuseCast screen.</span>
         </article>
       </section>
 
@@ -181,6 +181,22 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="sales-pricing sales-container" id="pricing">
+        <div className="sales-pricing-copy">
+          <div className="eyebrow">Transparent founding rate</div>
+          <h2>Every screen. Creative included. $75 a month.</h2>
+          <p>No quote request, confusing package, or surprise screen fee. Build and preview your campaign online, then subscribe securely while your message is fresh.</p>
+          <ul><li><Check size={16} aria-hidden="true" /> Placement on every active NeuseCast screen</li><li><Check size={16} aria-hidden="true" /> Screen-ready creative and revisions</li><li><Check size={16} aria-hidden="true" /> Verified proof-of-play reporting</li><li><Check size={16} aria-hidden="true" /> Cancel anytime</li></ul>
+        </div>
+        <div className="sales-price-card">
+          <span>ALL-SCREEN PLAN</span>
+          <strong><small>$</small>75<em>/month</em></strong>
+          <p>Paid campaigns enter the following day’s broadcast queue, subject to a fast content review.</p>
+          <Link className="button button-primary" href="/advertiser/new">Create your campaign <ArrowRight size={17} aria-hidden="true" /></Link>
+          <small>Secure recurring billing powered by Stripe.</small>
+        </div>
+      </section>
+
       <section className="sales-process" id="how-it-works">
         <div className="sales-container">
           <div className="sales-section-heading process-heading">
@@ -194,22 +210,22 @@ export default function Home() {
             <li>
               <span>1</span>
               <div>
-                <h3>Choose your campaign</h3>
-                <p>Tell us what you want to promote, where you want to run, and when it matters most.</p>
+                <h3>Create your account</h3>
+                <p>Add your business and contact details so your campaigns, billing, and results stay together.</p>
               </div>
             </li>
             <li>
               <span>2</span>
               <div>
-                <h3>Approve your creative</h3>
-                <p>Provide the basics and review the screen-ready design prepared for your business.</p>
+                <h3>Build and preview</h3>
+                <p>Write your offer, choose a visual style, and see the finished screen creative update instantly.</p>
               </div>
             </li>
             <li>
               <span>3</span>
               <div>
-                <h3>Go live locally</h3>
-                <p>We schedule the campaign across selected screens and handle future updates.</p>
+                <h3>Subscribe and queue</h3>
+                <p>Pay $75/month securely. Your creative enters review and queues for the following broadcast day.</p>
               </div>
             </li>
           </ol>
@@ -255,13 +271,13 @@ export default function Home() {
           <h2>Help build Eastern Carolina&apos;s local screen network.</h2>
           <p>
             NeuseCast is preparing its first host locations and advertiser roster in
-            and around New Bern. Founding advertisers receive first access to launch
-            inventory, while founding hosts receive priority installation review.
+            and around New Bern. Founding advertisers can lock in the simple $75 all-screen
+            plan, while founding hosts receive priority installation review.
           </p>
         </div>
         <div className="sales-launch-actions">
           <Link className="button button-primary" href="/advertiser/new">
-            Join as an advertiser <ArrowRight size={17} aria-hidden="true" />
+            Build a $75 campaign <ArrowRight size={17} aria-hidden="true" />
           </Link>
           <a className="button button-secondary" href="#hosts">Become a founding host</a>
         </div>
@@ -287,7 +303,7 @@ export default function Home() {
           </details>
           <details>
             <summary>Where will my campaign appear?<ChevronRight size={17} aria-hidden="true" /></summary>
-            <p>Every proposal identifies the included market, screens, and campaign dates before approval.</p>
+            <p>The founding $75/month plan includes every active screen in the NeuseCast network.</p>
           </details>
         </div>
       </section>

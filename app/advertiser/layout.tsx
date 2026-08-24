@@ -16,7 +16,7 @@ export default async function AdvertiserLayout({ children }: Readonly<{ children
         <Brand href="/" />
         <nav aria-label="Advertiser workspace">
           <Link href="/advertiser"><LayoutDashboard size={16} aria-hidden="true" /> Dashboard</Link>
-          <Link href="/advertiser/new"><PlusCircle size={16} aria-hidden="true" /> New campaign</Link>
+          <Link href="/advertiser/new"><PlusCircle size={16} aria-hidden="true" /> Build campaign · $75/mo</Link>
         </nav>
         <div className="advertiser-account-menu">
           <span>{user.firstName ?? "Advertiser"}</span>

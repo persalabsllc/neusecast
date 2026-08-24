@@ -34,7 +34,7 @@ export function CheckoutButton({ orderId }: { orderId: string }) {
     <div className="checkout-action">
       <button className="button button-primary" type="button" onClick={beginCheckout} disabled={loading}>
         {loading ? <LoaderCircle className="spin" size={17} aria-hidden="true" /> : <CreditCard size={17} aria-hidden="true" />}
-        {loading ? "Opening secure checkout…" : "Pay campaign"}
+        {loading ? "Opening secure checkout…" : "Subscribe for $75/month"}
       </button>
       {error ? <p role="alert">{error}</p> : null}
     </div>

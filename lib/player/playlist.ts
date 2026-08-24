@@ -11,6 +11,7 @@ import {
   venues,
 } from "@/lib/db/schema";
 import type { PlayerItem, PlayerItemKind, PlayerManifest, PlayerTheme } from "./types";
+import { NEUSECAST_PLAN } from "@/lib/pricing";
 
 const THEMES = new Set<PlayerTheme>(["aqua", "navy", "coral", "gold", "blue", "green"]);
 const KINDS = new Set<PlayerItemKind>(["advertisement", "host", "weather", "event", "history", "trivia", "community"]);
@@ -73,7 +74,7 @@ export async function getPlayerManifest(playerKey: string): Promise<PlayerManife
 
   const [creativeRows, hostRows, generatedRows] = await Promise.all([
     database
-      .select({
+      .selectDistinct({
         id: creatives.id,
         campaignId: campaigns.id,
         name: creatives.name,
@@ -86,10 +87,10 @@ export async function getPlayerManifest(playerKey: string): Promise<PlayerManife
       })
       .from(creatives)
       .innerJoin(campaigns, eq(creatives.campaignId, campaigns.id))
-      .innerJoin(campaignScreens, eq(campaignScreens.campaignId, campaigns.id))
+      .leftJoin(campaignScreens, eq(campaignScreens.campaignId, campaigns.id))
       .where(
         and(
-          eq(campaignScreens.screenId, screen.id),
+          or(eq(campaignScreens.screenId, screen.id), eq(campaigns.totalCents, NEUSECAST_PLAN.amountCents)),
           eq(creatives.status, "approved"),
           inArray(campaigns.status, ["approved", "scheduled", "active"]),
           activeWindow(campaigns.startsAt, campaigns.endsAt, now),

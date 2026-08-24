@@ -6,10 +6,10 @@ export default function CheckoutSuccessPage() {
     <main className="billing-result-page">
       <section className="billing-result-card">
         <span className="billing-result-icon"><BadgeCheck size={34} aria-hidden="true" /></span>
-        <span className="eyebrow">Payment received</span>
-        <h1>Your campaign is headed to review.</h1>
+        <span className="eyebrow">Subscription active</span>
+        <h1>You’re in tomorrow’s broadcast queue.</h1>
         <p>
-          NeuseCast has received your order. We’ll review the campaign details and creative before anything is scheduled on local screens.
+          Your $75 monthly subscription is active. NeuseCast will review your creative today; approved creative is scheduled across every active screen beginning the following broadcast day.
         </p>
         <Link className="button button-primary" href="/advertiser">
           View campaign status <ArrowRight size={17} aria-hidden="true" />
@@ -18,4 +18,3 @@ export default function CheckoutSuccessPage() {
     </main>
   );
 }
-

@@ -1,132 +1,59 @@
-import {
-  CalendarRange,
-  CircleDollarSign,
-  Eye,
-  Gauge,
-  Megaphone,
-  MoreHorizontal,
-  Plus,
-  Search,
-  Target,
-} from "lucide-react";
-import { campaigns, type CampaignStatus } from "@/lib/demo-data";
+import { count, countDistinct, desc, eq, inArray } from "drizzle-orm";
+import { BadgeCheck, Ban, BarChart3, CalendarClock, CircleDollarSign, Eye, Megaphone, Pause, ShieldCheck } from "lucide-react";
+import { getDatabase } from "@/lib/db";
+import { advertiserAccounts, campaigns, creatives, playbackEvents } from "@/lib/db/schema";
+import { NEUSECAST_MONTHLY_PRICE } from "@/lib/pricing";
+import { approveCreative, pauseCampaign, rejectCreative } from "./actions";
 
-const statusLabels: Record<CampaignStatus, string> = {
-  active: "Active",
-  scheduled: "Scheduled",
-  draft: "Draft",
-  paused: "Paused",
-};
+function metadataText(metadata: Record<string, unknown> | null, key: string) {
+  return typeof metadata?.[key] === "string" ? String(metadata[key]) : "";
+}
 
-const currency = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 0,
-});
-
-const number = new Intl.NumberFormat("en-US");
-
-export default function CampaignsPage() {
-  const bookedWeekly = campaigns
-    .filter((campaign) => campaign.status === "active" || campaign.status === "scheduled")
-    .reduce((sum, campaign) => sum + campaign.weeklyRate, 0);
-  const totalPlays = campaigns.reduce((sum, campaign) => sum + campaign.plays, 0);
+export default async function CampaignsPage() {
+  const database = getDatabase();
+  const [reviewRows, paidCampaigns, results] = await Promise.all([
+    database.select({
+      creativeId: creatives.id,
+      campaignId: campaigns.id,
+      campaignName: campaigns.name,
+      businessName: advertiserAccounts.businessName,
+      headline: creatives.headline,
+      body: creatives.body,
+      callToAction: creatives.callToAction,
+      metadata: creatives.metadata,
+      createdAt: creatives.createdAt,
+    }).from(creatives).innerJoin(campaigns, eq(creatives.campaignId, campaigns.id)).innerJoin(advertiserAccounts, eq(campaigns.advertiserAccountId, advertiserAccounts.id)).where(eq(creatives.status, "review")).orderBy(desc(creatives.createdAt)),
+    database.select({ id: campaigns.id, name: campaigns.name, businessName: advertiserAccounts.businessName, status: campaigns.status, startsAt: campaigns.startsAt }).from(campaigns).innerJoin(advertiserAccounts, eq(campaigns.advertiserAccountId, advertiserAccounts.id)).where(inArray(campaigns.status, ["payment_pending", "scheduled", "active", "paused"])).orderBy(desc(campaigns.createdAt)),
+    database.select({ campaignId: playbackEvents.campaignId, plays: count(playbackEvents.id), screens: countDistinct(playbackEvents.screenId) }).from(playbackEvents).groupBy(playbackEvents.campaignId),
+  ]);
+  const resultMap = new Map(results.map((row) => [row.campaignId, row]));
+  const activeCount = paidCampaigns.filter((campaign) => campaign.status === "active" || campaign.status === "scheduled").length;
 
   return (
     <div className="control-page">
-      <header className="page-header">
-        <div>
-          <p className="eyebrow">Sales & delivery</p>
-          <h1>Campaigns</h1>
-          <p className="page-description">
-            Build advertiser flights, control where they run, and track proof of play.
-          </p>
-        </div>
-        <div className="page-actions">
-          <button className="button button-primary" type="button">
-            <Plus size={16} aria-hidden="true" /> New campaign
-          </button>
-        </div>
-      </header>
-
+      <header className="page-header"><div><p className="eyebrow">Sales &amp; delivery</p><h1>Campaigns</h1><p className="page-description">Review paid creative, control broadcast eligibility, and track verified delivery.</p></div></header>
       <section className="metric-grid metric-grid-4" aria-label="Campaign summary">
-        <article className="metric-card">
-          <span className="metric-icon metric-icon-coral"><Megaphone size={18} aria-hidden="true" /></span>
-          <div><p className="metric-label">Active campaigns</p><p className="metric-value">2</p><p className="metric-detail">1 scheduled next</p></div>
-        </article>
-        <article className="metric-card">
-          <span className="metric-icon metric-icon-green"><CircleDollarSign size={18} aria-hidden="true" /></span>
-          <div><p className="metric-label">Weekly booked</p><p className="metric-value">{currency.format(bookedWeekly)}</p><p className="metric-detail">Active + scheduled</p></div>
-        </article>
-        <article className="metric-card">
-          <span className="metric-icon metric-icon-blue"><Eye size={18} aria-hidden="true" /></span>
-          <div><p className="metric-label">Verified plays</p><p className="metric-value">{number.format(totalPlays)}</p><p className="metric-detail">Current flight window</p></div>
-        </article>
-        <article className="metric-card">
-          <span className="metric-icon metric-icon-violet"><Target size={18} aria-hidden="true" /></span>
-          <div><p className="metric-label">Delivery rate</p><p className="metric-value">96.8%</p><p className="metric-detail">Against scheduled spots</p></div>
-        </article>
+        <article className="metric-card"><span className="metric-icon metric-icon-coral"><ShieldCheck size={18} aria-hidden="true" /></span><div><p className="metric-label">Creative to review</p><p className="metric-value">{reviewRows.length}</p><p className="metric-detail">Paid and waiting</p></div></article>
+        <article className="metric-card"><span className="metric-icon metric-icon-green"><Megaphone size={18} aria-hidden="true" /></span><div><p className="metric-label">Live or queued</p><p className="metric-value">{activeCount}</p><p className="metric-detail">Across all active screens</p></div></article>
+        <article className="metric-card"><span className="metric-icon metric-icon-blue"><BarChart3 size={18} aria-hidden="true" /></span><div><p className="metric-label">Verified plays</p><p className="metric-value">{results.reduce((sum, row) => sum + row.plays, 0).toLocaleString()}</p><p className="metric-detail">Proof of play</p></div></article>
+        <article className="metric-card"><span className="metric-icon metric-icon-violet"><CircleDollarSign size={18} aria-hidden="true" /></span><div><p className="metric-label">Standard plan</p><p className="metric-value">{NEUSECAST_MONTHLY_PRICE}</p><p className="metric-detail">Per campaign / month</p></div></article>
       </section>
 
-      <section className="panel">
-        <div className="panel-toolbar">
-          <div className="segmented-control" aria-label="Filter campaigns by status">
-            <button className="segment is-active" type="button">All <span>{campaigns.length}</span></button>
-            <button className="segment" type="button">Active <span>2</span></button>
-            <button className="segment" type="button">Upcoming <span>1</span></button>
-            <button className="segment" type="button">Drafts <span>1</span></button>
-          </div>
-          <label className="search-field">
-            <Search size={16} aria-hidden="true" />
-            <span className="sr-only">Search campaigns</span>
-            <input type="search" placeholder="Search advertiser" />
-          </label>
-        </div>
+      <section className="panel campaign-review-panel">
+        <div className="section-title-row"><div><span>Moderation queue</span><h2>Creative awaiting review</h2></div><p>Approving makes the newest creative eligible at its scheduled start. Rejecting keeps it off every player.</p></div>
+        {reviewRows.length === 0 ? <div className="control-empty"><BadgeCheck size={24} aria-hidden="true" /><strong>Review queue is clear.</strong><span>New paid campaigns will appear here automatically.</span></div> : <div className="review-creative-grid">{reviewRows.map((creative) => {
+          const theme = metadataText(creative.metadata, "theme") || "aqua";
+          return <article className="review-creative-card" key={creative.creativeId}>
+            <div className={`campaign-creative-preview theme-${theme}`}><div className="campaign-creative-topline"><span>{metadataText(creative.metadata, "eyebrow") || "Local business"}</span><span>Eastern Carolina</span></div><div className="campaign-creative-message"><strong>{creative.headline}</strong><p>{creative.body}</p></div><div className="campaign-creative-footer"><span>{creative.callToAction}</span><span>NEUSECAST</span></div></div>
+            <div className="review-creative-meta"><span>{creative.businessName}</span><h3>{creative.campaignName}</h3><small>Submitted {creative.createdAt.toLocaleString("en-US", { timeZone: "America/New_York" })}</small></div>
+            <div className="review-actions"><form action={approveCreative}><input type="hidden" name="creativeId" value={creative.creativeId} /><input type="hidden" name="campaignId" value={creative.campaignId} /><button className="button button-primary button-small"><BadgeCheck size={15} aria-hidden="true" /> Approve</button></form><form action={rejectCreative}><input type="hidden" name="creativeId" value={creative.creativeId} /><button className="button button-secondary button-small"><Ban size={15} aria-hidden="true" /> Reject</button></form></div>
+          </article>;
+        })}</div>}
+      </section>
 
-        <div className="campaign-grid">
-          {campaigns.map((campaign) => {
-            const delivery = campaign.playGoal === 0 ? 0 : Math.min(100, Math.round((campaign.plays / campaign.playGoal) * 100));
-            return (
-              <article className="campaign-card" key={campaign.id}>
-                <div className="campaign-card-head">
-                  <div className="advertiser-mark" aria-hidden="true">{campaign.advertiser.slice(0, 2).toUpperCase()}</div>
-                  <div className="campaign-heading">
-                    <p>{campaign.advertiser}</p>
-                    <h2>{campaign.name}</h2>
-                  </div>
-                  <button className="icon-button" type="button" aria-label={`Open actions for ${campaign.name}`}>
-                    <MoreHorizontal size={18} aria-hidden="true" />
-                  </button>
-                </div>
-
-                <div className="campaign-status-line">
-                  <span className={`status-badge status-${campaign.status}`}>
-                    <span className="status-dot" aria-hidden="true" />
-                    {statusLabels[campaign.status]}
-                  </span>
-                  <span>{campaign.id}</span>
-                </div>
-
-                <dl className="campaign-details">
-                  <div><dt><CalendarRange size={14} aria-hidden="true" /> Flight</dt><dd>{campaign.flight}</dd></div>
-                  <div><dt><CircleDollarSign size={14} aria-hidden="true" /> Weekly</dt><dd>{currency.format(campaign.weeklyRate)}</dd></div>
-                  <div><dt><Megaphone size={14} aria-hidden="true" /> Placement</dt><dd>{campaign.screenCount} screens · {campaign.primaryMarket}</dd></div>
-                </dl>
-
-                <div className="delivery-block">
-                  <div className="delivery-label">
-                    <span><Gauge size={14} aria-hidden="true" /> Spot delivery</span>
-                    <strong>{delivery}%</strong>
-                  </div>
-                  <span className="progress-track progress-track-wide" aria-hidden="true">
-                    <span style={{ width: `${delivery}%` }} />
-                  </span>
-                  <p>{number.format(campaign.plays)} of {number.format(campaign.playGoal)} planned plays</p>
-                </div>
-              </article>
-            );
-          })}
-        </div>
+      <section className="panel campaign-review-panel">
+        <div className="section-title-row"><div><span>Delivery</span><h2>Paid campaign roster</h2></div></div>
+        <div className="paid-campaign-table">{paidCampaigns.map((campaign) => { const result = resultMap.get(campaign.id); return <article key={campaign.id}><div><span className={`status-badge status-${campaign.status}`}>{campaign.status}</span><h3>{campaign.businessName} · {campaign.name}</h3></div><dl><div><dt><CalendarClock size={14} /> Start</dt><dd>{campaign.startsAt ? campaign.startsAt.toLocaleDateString("en-US", { timeZone: "America/New_York" }) : "After payment"}</dd></div><div><dt><Eye size={14} /> Results</dt><dd>{result ? `${result.plays} plays · ${result.screens} screens` : "No plays yet"}</dd></div></dl><form action={pauseCampaign}><input type="hidden" name="campaignId" value={campaign.id} /><button className="button button-secondary button-small" disabled={campaign.status === "paused"}><Pause size={14} /> Pause</button></form></article>; })}</div>
       </section>
     </div>
   );
