@@ -2,7 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { currentUser } from "@clerk/nextjs/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -56,14 +56,14 @@ export async function activateScreen(formData: FormData) {
 
   const database = getDatabase();
   const [selectedHost] = existingHostId
-    ? await database.select({ clerkUserId: appUsers.clerkUserId }).from(appUsers).where(and(eq(appUsers.clerkUserId, existingHostId), eq(appUsers.role, "host"))).limit(1)
+    ? await database.select({ clerkUserId: appUsers.clerkUserId }).from(appUsers).where(and(eq(appUsers.clerkUserId, existingHostId), eq(appUsers.role, "host"), inArray(appUsers.status, ["active", "invited"]))).limit(1)
     : [];
   if (existingHostId && !selectedHost) redirect("/control/screens?error=host");
 
   const [emailUser] = !selectedHost
-    ? await database.select({ clerkUserId: appUsers.clerkUserId, role: appUsers.role }).from(appUsers).where(eq(appUsers.email, hostEmail)).limit(1)
+    ? await database.select({ clerkUserId: appUsers.clerkUserId, role: appUsers.role, status: appUsers.status }).from(appUsers).where(eq(appUsers.email, hostEmail)).limit(1)
     : [];
-  if (emailUser && emailUser.role !== "host") redirect("/control/screens?error=host");
+  if (emailUser && (emailUser.role !== "host" || emailUser.status === "suspended")) redirect("/control/screens?error=host");
   const hostClerkUserId = selectedHost?.clerkUserId ?? emailUser?.clerkUserId ?? `invited:${hostEmail}`;
   if (!selectedHost && !emailUser) await database.insert(appUsers).values({ clerkUserId: hostClerkUserId, email: hostEmail, displayName: hostName || venueName, role: "host", status: "invited" });
 

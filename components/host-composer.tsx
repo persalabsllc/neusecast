@@ -86,7 +86,7 @@ function formatSchedule(date: string, time: string) {
   return `Starts ${label} at ${timeLabel}`;
 }
 
-type HostScreenOption = { id: string; label: string };
+type HostScreenOption = { id: string; label: string; timeZone: string };
 
 export function HostComposer({ screens }: { screens: HostScreenOption[] }) {
   const [templateId, setTemplateId] = useState<TemplateId>("special");
@@ -268,6 +268,7 @@ export function HostComposer({ screens }: { screens: HostScreenOption[] }) {
                     </option>
                   ))}
                 </select>
+                <span className="field-help">Scheduled times use {selectedScreen?.timeZone.replaceAll("_", " ") ?? "the venue timezone"}.</span>
               </label>
 
               <label className="field">

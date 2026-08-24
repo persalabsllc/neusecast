@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { Activity, MapPin, Monitor, Plus, Radio, TriangleAlert, Wifi, WifiOff } from "lucide-react";
 import { ScreenFleetRefresh } from "@/components/screen-fleet-refresh";
 import { ScreenPreviewDialog } from "@/components/screen-preview-dialog";
@@ -78,7 +78,7 @@ export default async function ScreensPage({ searchParams }: { searchParams: Prom
     database
       .select({ id: appUsers.clerkUserId, name: appUsers.displayName, email: appUsers.email, status: appUsers.status })
       .from(appUsers)
-      .where(eq(appUsers.role, "host"))
+      .where(and(eq(appUsers.role, "host"), inArray(appUsers.status, ["active", "invited"])))
       .orderBy(appUsers.displayName),
   ]);
   const now = new Date();

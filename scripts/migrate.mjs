@@ -7,6 +7,8 @@ const databaseUrl = process.env.DATABASE_URL;
 
 if (!databaseUrl) {
   console.log("DATABASE_URL is not set; skipping database migrations for this build.");
+} else if (process.env.VERCEL === "1" && process.env.VERCEL_ENV !== "production") {
+  console.log("Skipping database migrations for a non-production Vercel deployment.");
 } else {
   const client = neon(databaseUrl);
   const owner = randomUUID();
