@@ -102,7 +102,10 @@ export async function createCampaignCheckout(orderId: string, clerkUserId: strin
   if (order.stripeCheckoutSessionId) {
     const existingSession = await stripe.checkout.sessions.retrieve(order.stripeCheckoutSessionId);
     if (existingSession.status === "open" && existingSession.url) return existingSession.url;
-    if (existingSession.status === "complete") {
+    if (
+      existingSession.status === "complete"
+      && (order.status !== "failed" || existingSession.payment_status === "paid")
+    ) {
       throw new BillingError("Your payment is already being processed. Refresh your campaign dashboard in a moment.", 409);
     }
   }
@@ -129,14 +132,17 @@ export async function createCampaignCheckout(orderId: string, clerkUserId: strin
   }
 
   if (!customerId) {
-    const customer = await stripe.customers.create({
-      name: order.businessName,
-      email: order.billingEmail,
-      metadata: {
-        neusecastAdvertiserAccountId: order.advertiserAccountId,
-        clerkUserId,
+    const customer = await stripe.customers.create(
+      {
+        name: order.businessName,
+        email: order.billingEmail,
+        metadata: {
+          neusecastAdvertiserAccountId: order.advertiserAccountId,
+          clerkUserId,
+        },
       },
-    });
+      { idempotencyKey: `neusecast-advertiser-${order.advertiserAccountId}-customer` },
+    );
     customerId = customer.id;
     await database
       .update(advertiserAccounts)

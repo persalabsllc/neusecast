@@ -31,9 +31,9 @@ export default async function ControlDashboard() {
   const db = getDatabase();
   const [screenRows, campaignRows, creativeRows, advertiserRows, playRows] = await Promise.all([
     db.select({ id: screens.id, name: screens.name, status: screens.status, active: screens.active, lastHeartbeatAt: screens.lastHeartbeatAt, playerKey: screens.providerScreenId, venue: venues.name, city: venues.city }).from(screens).innerJoin(venues, eq(screens.venueId, venues.id)).orderBy(desc(screens.createdAt)),
-    db.select({ status: campaigns.status, subscriptionStatus: advertiserAccounts.subscriptionStatus }).from(campaigns).innerJoin(advertiserAccounts, eq(campaigns.advertiserAccountId, advertiserAccounts.id)),
-    db.select({ status: creatives.status, subscriptionStatus: advertiserAccounts.subscriptionStatus }).from(creatives).innerJoin(campaigns, eq(creatives.campaignId, campaigns.id)).innerJoin(advertiserAccounts, eq(campaigns.advertiserAccountId, advertiserAccounts.id)),
-    db.select({ subscriptionStatus: advertiserAccounts.subscriptionStatus }).from(advertiserAccounts),
+    db.select({ status: campaigns.status, endsAt: campaigns.endsAt, billingPaused: campaigns.billingPaused, advertiserActive: advertiserAccounts.active, subscriptionStatus: advertiserAccounts.subscriptionStatus }).from(campaigns).innerJoin(advertiserAccounts, eq(campaigns.advertiserAccountId, advertiserAccounts.id)),
+    db.select({ status: creatives.status, billingPaused: campaigns.billingPaused, advertiserActive: advertiserAccounts.active, subscriptionStatus: advertiserAccounts.subscriptionStatus }).from(creatives).innerJoin(campaigns, eq(creatives.campaignId, campaigns.id)).innerJoin(advertiserAccounts, eq(campaigns.advertiserAccountId, advertiserAccounts.id)),
+    db.select({ active: advertiserAccounts.active, subscriptionStatus: advertiserAccounts.subscriptionStatus }).from(advertiserAccounts),
     db.select({ id: playbackEvents.id }).from(playbackEvents),
   ]);
   const now = new Date();
@@ -49,9 +49,20 @@ export default async function ControlDashboard() {
     }));
   const onlineScreens = activeScreens.filter((screen) => screen.health === "online");
   const attentionScreens = activeScreens.filter((screen) => screen.health !== "online");
-  const activeCampaigns = campaignRows.filter((campaign) => campaign.subscriptionStatus === "active" && ["approved", "scheduled", "active"].includes(campaign.status)).length;
-  const reviewCount = creativeRows.filter((creative) => creative.subscriptionStatus === "active" && creative.status === "review").length;
-  const activeSubscriptions = advertiserRows.filter((advertiser) => advertiser.subscriptionStatus === "active").length;
+  const activeCampaigns = campaignRows.filter((campaign) => (
+    campaign.advertiserActive
+    && campaign.subscriptionStatus === "active"
+    && !campaign.billingPaused
+    && (!campaign.endsAt || campaign.endsAt >= now)
+    && ["approved", "scheduled", "active"].includes(campaign.status)
+  )).length;
+  const reviewCount = creativeRows.filter((creative) => (
+    creative.advertiserActive
+    && creative.subscriptionStatus === "active"
+    && !creative.billingPaused
+    && creative.status === "review"
+  )).length;
+  const activeSubscriptions = advertiserRows.filter((advertiser) => advertiser.active && advertiser.subscriptionStatus === "active").length;
   const monthlyRecurringRevenue = activeSubscriptions * 7_500;
   const firstPlayer = activeScreens.find((screen) => screen.playerKey)?.playerKey;
   const metrics = [

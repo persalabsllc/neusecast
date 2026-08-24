@@ -60,6 +60,8 @@ npm run build
 
 Vercel must provide the Clerk, Neon, Stripe, and application URL environment variables listed in `.env.example`. Stripe sends subscription and Checkout events to `/api/stripe/webhook`. After the custom domain is connected, update `NEXT_PUBLIC_APP_URL`, configure the production domain in Clerk, and issue fresh player pairing links for devices moving from the Vercel domain.
 
+Keep Clerk's email verification requirement enabled. NeuseCast independently requires a verified primary Clerk email before an advertiser can create an account, a host can claim an invitation, or an administrator can enter the Control Room.
+
 Automatic filler uses the OpenAI Responses API with live web search and structured output. Set `OPENAI_API_KEY`, optionally override `OPENAI_FILLER_MODEL`, and keep `CRON_SECRET` configured so Vercel can authenticate the daily `/api/cron/filler` refresh and three-hour `/api/cron/filler/weather` refresh. Administrators can also run the same generator on demand from Control Room → Content.
 
 Before taking the first live advertiser payment:

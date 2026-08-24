@@ -1,6 +1,6 @@
-import { and, eq, isNull, lte, or } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { getDatabase } from "@/lib/db";
-import { playbackEvents, playerManifestSnapshots, screens } from "@/lib/db/schema";
+import { playbackEvents, playerManifestSnapshots } from "@/lib/db/schema";
 import {
   authenticatePlayerDevice,
   playerDeviceAuthErrorResponse,
@@ -112,53 +112,60 @@ export async function POST(
     const minimumGapMs = Math.max(3_000, Math.min(30_000, manifestItem.durationSeconds * 700));
     const latestAllowedPlaybackAt = new Date(reportedPlaybackAt.getTime() - minimumGapMs);
     const isCurrentPlayback = ageMs <= 5 * 60 * 1_000;
-    const reserved = await database
-      .update(screens)
-      .set({
-        lastPlaybackAt: reportedPlaybackAt,
-        ...(isCurrentPlayback ? {
-          currentItemId: manifestItem.id,
-          currentManifestVersion: reportedManifestVersion,
-        } : {}),
-        updatedAt: now,
-      })
-      .where(and(
-        eq(screens.id, device.screenId),
-        or(
-          isNull(screens.lastPlaybackAt),
-          lte(screens.lastPlaybackAt, latestAllowedPlaybackAt),
-        ),
-      ))
-      .returning({ id: screens.id });
+    const playbackMetadata = {
+      itemId: manifestItem.id,
+      source: manifestItem.source,
+      player: "neusecast-web",
+      deviceId: device.deviceId,
+      manifestVersion: reportedManifestVersion,
+      sessionId: boundedText(payload.sessionId, 128),
+      playerVersion: boundedText(payload.playerVersion, 80),
+      receivedAt: now.toISOString(),
+    };
+    const result = await database.execute(sql<{ reserved: boolean; inserted: boolean }>`
+      WITH reserved_screen AS (
+        UPDATE "screens"
+        SET
+          "last_playback_at" = ${reportedPlaybackAt},
+          "current_item_id" = CASE WHEN ${isCurrentPlayback} THEN ${manifestItem.id} ELSE "current_item_id" END,
+          "current_manifest_version" = CASE WHEN ${isCurrentPlayback} THEN ${reportedManifestVersion} ELSE "current_manifest_version" END,
+          "updated_at" = ${now}
+        WHERE
+          "id" = ${device.screenId}
+          AND ("last_playback_at" IS NULL OR "last_playback_at" <= ${latestAllowedPlaybackAt})
+        RETURNING "id"
+      ),
+      inserted_event AS (
+        INSERT INTO "playback_events" (
+          "screen_id", "campaign_id", "creative_id", "provider_event_id",
+          "played_at", "duration_seconds", "metadata"
+        )
+        SELECT
+          ${device.screenId}, ${manifestItem.campaignId}, ${manifestItem.creativeId}, ${eventId.slice(0, 255)},
+          ${reportedPlaybackAt}, ${manifestItem.durationSeconds}, ${JSON.stringify(playbackMetadata)}::jsonb
+        FROM reserved_screen
+        ON CONFLICT ("provider_event_id") DO NOTHING
+        RETURNING "id"
+      )
+      SELECT
+        EXISTS(SELECT 1 FROM reserved_screen) AS "reserved",
+        EXISTS(SELECT 1 FROM inserted_event) AS "inserted"
+    `);
+    const outcome = result.rows[0] as { reserved: boolean; inserted: boolean } | undefined;
 
-    if (reserved.length === 0) {
+    if (!outcome?.reserved) {
+      const [duplicateAfterReservation] = await database
+        .select({ id: playbackEvents.id })
+        .from(playbackEvents)
+        .where(eq(playbackEvents.providerEventId, eventId))
+        .limit(1);
+      if (duplicateAfterReservation) {
+        return Response.json({ ok: true, duplicate: true, serverTime: now.toISOString() }, { status: 202 });
+      }
       return Response.json({ error: "Playback event arrived faster than the scheduled rotation" }, { status: 429 });
     }
 
-    const inserted = await database
-      .insert(playbackEvents)
-      .values({
-        screenId: device.screenId,
-        campaignId: manifestItem.campaignId,
-        creativeId: manifestItem.creativeId,
-        providerEventId: eventId.slice(0, 255),
-        playedAt: reportedPlaybackAt,
-        durationSeconds: manifestItem.durationSeconds,
-        metadata: {
-          itemId: manifestItem.id,
-          source: manifestItem.source,
-          player: "neusecast-web",
-          deviceId: device.deviceId,
-          manifestVersion: reportedManifestVersion,
-          sessionId: boundedText(payload.sessionId, 128),
-          playerVersion: boundedText(payload.playerVersion, 80),
-          receivedAt: now.toISOString(),
-        },
-      })
-      .onConflictDoNothing({ target: playbackEvents.providerEventId })
-      .returning({ id: playbackEvents.id });
-
-    return Response.json({ ok: true, duplicate: inserted.length === 0, serverTime: now.toISOString() }, { status: 202 });
+    return Response.json({ ok: true, duplicate: !outcome.inserted, serverTime: now.toISOString() }, { status: 202 });
   } catch (error) {
     return playerDeviceAuthErrorResponse(error);
   }

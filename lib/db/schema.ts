@@ -12,6 +12,7 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -64,12 +65,13 @@ export const advertiserAccounts = pgTable(
     website: text("website"),
     stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
     stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
+    stripeEventCreatedAt: timestamp("stripe_event_created_at", { withTimezone: true }),
     subscriptionStatus: varchar("subscription_status", { length: 32 }).default("inactive").notNull(),
     active: boolean("active").default(true).notNull(),
     ...timestamps,
   },
   (table) => [
-    index("advertiser_owner_idx").on(table.ownerClerkUserId),
+    uniqueIndex("advertiser_owner_idx").on(table.ownerClerkUserId),
     uniqueIndex("advertiser_stripe_customer_idx").on(table.stripeCustomerId),
     uniqueIndex("advertiser_stripe_subscription_idx").on(table.stripeSubscriptionId),
   ],
@@ -280,6 +282,9 @@ export const campaignOrders = pgTable(
   (table) => [
     index("orders_campaign_idx").on(table.campaignId),
     uniqueIndex("orders_checkout_session_idx").on(table.stripeCheckoutSessionId),
+    uniqueIndex("orders_open_advertiser_idx")
+      .on(table.advertiserAccountId)
+      .where(sql`${table.status} in ('pending', 'failed') and ${table.stripePaymentIntentId} is null`),
   ],
 );
 

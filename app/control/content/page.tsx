@@ -111,7 +111,11 @@ export default async function ContentPage({ searchParams }: {
         status: creatives.status,
         duration: creatives.durationSeconds,
         campaign: campaigns.name,
+        campaignStatus: campaigns.status,
+        billingPaused: campaigns.billingPaused,
         business: advertiserAccounts.businessName,
+        advertiserActive: advertiserAccounts.active,
+        subscriptionStatus: advertiserAccounts.subscriptionStatus,
         updatedAt: creatives.updatedAt,
       })
       .from(creatives)
@@ -124,6 +128,7 @@ export default async function ContentPage({ searchParams }: {
         headline: hostContent.headline,
         status: hostContent.status,
         venue: venues.name,
+        timeZone: venues.timeZone,
         screen: screens.name,
         startsAt: hostContent.startsAt,
         endsAt: hostContent.endsAt,
@@ -151,7 +156,7 @@ export default async function ContentPage({ searchParams }: {
       })
       .from(generatedContent)
       .orderBy(desc(generatedContent.updatedAt)),
-    db.selectDistinct({ market: venues.market }).from(venues).orderBy(venues.market),
+    db.selectDistinct({ market: venues.market, timeZone: venues.timeZone }).from(venues).orderBy(venues.market),
     db
       .select({
         market: venues.market,
@@ -177,12 +182,22 @@ export default async function ContentPage({ searchParams }: {
     .map((screen) => new Set(selectBalancedFiller(fillerWithState.filter((item) => (
       item.state === "airing" && (!item.market || item.market === screen.market)
     )).slice(0, 200)).map((item) => item.id)));
+  const hasActiveBilling = (item: (typeof adRows)[number]) => (
+    item.advertiserActive
+    && item.subscriptionStatus === "active"
+    && !item.billingPaused
+  );
   const reviewCount = adRows.filter((item) => item.status === "review").length;
-  const approvedCount = adRows.filter((item) => item.status === "approved").length;
+  const airReadyCount = adRows.filter((item) => (
+    item.status === "approved"
+    && hasActiveBilling(item)
+    && ["approved", "scheduled", "active"].includes(item.campaignStatus)
+  )).length;
   const liveHostCount = hostRows.filter((item) => ["scheduled", "approved"].includes(item.status)).length;
   const activeFillerIds = new Set(rotationIdsByScreen.flatMap((ids) => [...ids]));
   const activeFillerCount = activeFillerIds.size + 1;
   const markets = [...new Set(marketRows.map((item) => item.market).filter(Boolean))];
+  const timeZoneByMarket = new Map(marketRows.map((item) => [item.market, item.timeZone]));
 
   return (
     <div className="control-page">
@@ -209,7 +224,7 @@ export default async function ContentPage({ searchParams }: {
 
       <section className="metric-grid metric-grid-4" aria-label="Content library summary">
         <article className="metric-card compact-metric-card"><span className="metric-icon metric-icon-gold"><Clock3 size={18} /></span><div><p className="metric-label">Advertiser review</p><p className="metric-value">{reviewCount}</p></div><span className="metric-callout">Admin approval required</span></article>
-        <article className="metric-card compact-metric-card"><span className="metric-icon metric-icon-green"><Check size={18} /></span><div><p className="metric-label">Approved ads</p><p className="metric-value">{approvedCount}</p></div><span className="metric-callout">Eligible to air</span></article>
+        <article className="metric-card compact-metric-card"><span className="metric-icon metric-icon-green"><Check size={18} /></span><div><p className="metric-label">Air-ready ads</p><p className="metric-value">{airReadyCount}</p></div><span className="metric-callout">Approved + billing active</span></article>
         <article className="metric-card compact-metric-card"><span className="metric-icon metric-icon-teal"><MonitorPlay size={18} /></span><div><p className="metric-label">Host posts</p><p className="metric-value">{liveHostCount}</p></div><span className="metric-callout">Published directly</span></article>
         <article className="metric-card compact-metric-card"><span className="metric-icon metric-icon-blue"><Sparkles size={18} /></span><div><p className="metric-label">Filler airing</p><p className="metric-value">{activeFillerCount}</p></div><span className="metric-callout">Includes house promo</span></article>
       </section>
@@ -282,7 +297,8 @@ export default async function ContentPage({ searchParams }: {
                   </div>
                   <div className="metadata-row">
                     {item.sourceUrl ? <Link href={item.sourceUrl} target="_blank" rel="noopener noreferrer">Source: {item.sourceName || "Open source"}</Link> : <span>{item.sourceName ? `Source: ${item.sourceName}` : "No source attached"}</span>}
-                    {item.expiresAt ? <span>Expires {item.expiresAt.toLocaleString()}</span> : <span>No expiration</span>}
+                    {item.startsAt ? <span>Starts {item.startsAt.toLocaleString("en-US", { timeZone: timeZoneByMarket.get(item.market ?? "") ?? "America/New_York", timeZoneName: "short" })}</span> : null}
+                    {item.expiresAt ? <span>Expires {item.expiresAt.toLocaleString("en-US", { timeZone: timeZoneByMarket.get(item.market ?? "") ?? "America/New_York", timeZoneName: "short" })}</span> : <span>No expiration</span>}
                   </div>
                 </div>
                 <div className="filler-row-actions">
@@ -301,8 +317,8 @@ export default async function ContentPage({ searchParams }: {
         </div>
       </section>
 
-      <section className="panel"><div className="panel-heading"><div><p className="eyebrow">Paid campaigns</p><h2>Advertiser creative</h2></div></div>{adRows.length ? <div className="content-list">{adRows.map((item) => <article className="content-row" key={item.id}><span className="metric-icon metric-icon-gold"><Megaphone size={18} /></span><div className="content-main"><div className="content-title-line"><h2>{item.headline || item.name}</h2><span className={`status-badge status-${item.status === "approved" ? "approved" : item.status === "review" ? "pending" : "revision"}`}>{item.status}</span></div><p>{item.business} · {item.campaign}</p><div className="metadata-row"><span>{item.duration} sec</span><span>Updated {item.updatedAt.toLocaleDateString()}</span></div></div></article>)}</div> : <div className="empty-state"><h3>No advertiser creative yet</h3><p>Completed advertiser onboarding will appear here for review.</p></div>}</section>
-      <section className="panel"><div className="panel-heading"><div><p className="eyebrow">Venue-owned</p><h2>Host content</h2></div></div>{hostRows.length ? <div className="content-list">{hostRows.map((item) => <article className="content-row" key={item.id}><span className="metric-icon metric-icon-teal"><MonitorPlay size={18} /></span><div className="content-main"><div className="content-title-line"><h2>{item.headline}</h2><span className={`status-badge status-${["scheduled", "approved"].includes(item.status) ? "approved" : "revision"}`}>{item.status}</span></div><p>{item.venue}{item.screen ? ` · ${item.screen}` : ""}</p><div className="metadata-row"><span>{item.startsAt ? `Starts ${item.startsAt.toLocaleString()}` : "Published immediately"}</span>{item.endsAt ? <span>Ends {item.endsAt.toLocaleString()}</span> : null}</div></div></article>)}</div> : <div className="empty-state"><h3>No host content yet</h3><p>Host posts will appear here as soon as they publish to a screen.</p></div>}</section>
+      <section className="panel"><div className="panel-heading"><div><p className="eyebrow">Advertiser campaigns</p><h2>Advertiser creative</h2><p>Editorial status and billing entitlement are shown separately. Only approved, entitled creative enters player manifests.</p></div></div>{adRows.length ? <div className="content-list">{adRows.map((item) => { const billingActive = hasActiveBilling(item); const billingLabel = billingActive ? "Billing active" : !item.advertiserActive ? "Account disabled" : item.billingPaused ? "Billing hold" : `Billing ${item.subscriptionStatus.replaceAll("_", " ")}`; return <article className="content-row" key={item.id}><span className="metric-icon metric-icon-gold"><Megaphone size={18} /></span><div className="content-main"><div className="content-title-line"><h2>{item.headline || item.name}</h2><span className={`status-badge status-${item.status === "approved" ? "approved" : item.status === "review" ? "pending" : "revision"}`}>{item.status}</span><span className={`status-badge status-${billingActive ? "active" : "payment_pending"}`}>{billingLabel}</span></div><p>{item.business} · {item.campaign}</p><div className="metadata-row"><span>{item.duration} sec</span><span>Campaign {item.campaignStatus.replaceAll("_", " ")}</span><span>Updated {item.updatedAt.toLocaleDateString("en-US", { timeZone: "America/New_York" })}</span></div></div></article>; })}</div> : <div className="empty-state"><h3>No advertiser creative yet</h3><p>Completed advertiser onboarding will appear here for review.</p></div>}</section>
+      <section className="panel"><div className="panel-heading"><div><p className="eyebrow">Venue-owned</p><h2>Host content</h2></div></div>{hostRows.length ? <div className="content-list">{hostRows.map((item) => <article className="content-row" key={item.id}><span className="metric-icon metric-icon-teal"><MonitorPlay size={18} /></span><div className="content-main"><div className="content-title-line"><h2>{item.headline}</h2><span className={`status-badge status-${["scheduled", "approved"].includes(item.status) ? "approved" : "revision"}`}>{item.status}</span></div><p>{item.venue}{item.screen ? ` · ${item.screen}` : ""}</p><div className="metadata-row"><span>{item.startsAt ? `Starts ${item.startsAt.toLocaleString("en-US", { timeZone: item.timeZone, timeZoneName: "short" })}` : "Published immediately"}</span>{item.endsAt ? <span>Ends {item.endsAt.toLocaleString("en-US", { timeZone: item.timeZone, timeZoneName: "short" })}</span> : null}</div></div></article>)}</div> : <div className="empty-state"><h3>No host content yet</h3><p>Host posts will appear here as soon as they publish to a screen.</p></div>}</section>
     </div>
   );
 }

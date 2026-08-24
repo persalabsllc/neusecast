@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getDatabase } from "@/lib/db";
+import { verifiedPrimaryEmail } from "@/lib/auth-email";
 import { generatedContent } from "@/lib/db/schema";
 import {
   FILLER_CATEGORIES,
@@ -23,7 +24,7 @@ const controlRoomEmails = new Set(
 
 async function requireControlUser() {
   const user = await currentUser();
-  const email = user?.primaryEmailAddress?.emailAddress.toLowerCase();
+  const email = verifiedPrimaryEmail(user);
   if (!user || !email || !controlRoomEmails.has(email)) {
     throw new Error("Control Room authorization required.");
   }

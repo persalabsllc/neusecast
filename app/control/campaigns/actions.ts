@@ -4,6 +4,7 @@ import { and, eq, ne } from "drizzle-orm";
 import { currentUser } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { getDatabase } from "@/lib/db";
+import { verifiedPrimaryEmail } from "@/lib/auth-email";
 import { advertiserAccounts, campaigns, creatives } from "@/lib/db/schema";
 
 const controlRoomEmails = new Set(
@@ -15,7 +16,7 @@ const controlRoomEmails = new Set(
 
 async function requireControlUser() {
   const user = await currentUser();
-  const email = user?.primaryEmailAddress?.emailAddress.toLowerCase();
+  const email = verifiedPrimaryEmail(user);
   if (!email || !controlRoomEmails.has(email)) throw new Error("Control Room authorization required.");
 }
 

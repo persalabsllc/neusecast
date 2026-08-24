@@ -5,10 +5,11 @@ import { UserButton } from "@clerk/nextjs";
 import { redirect } from "next/navigation";
 import { LayoutDashboard, PlusCircle } from "lucide-react";
 import { Brand } from "@/components/brand";
+import { verifiedPrimaryEmail } from "@/lib/auth-email";
 
 export default async function AdvertiserLayout({ children }: Readonly<{ children: ReactNode }>) {
   const user = await currentUser();
-  if (!user) redirect("/sign-in?redirect_url=/advertiser");
+  if (!user || !verifiedPrimaryEmail(user)) redirect("/sign-in?redirect_url=/advertiser");
 
   return (
     <div className="advertiser-shell">

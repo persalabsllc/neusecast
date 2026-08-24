@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { PlayerRuntime } from "@/components/player-runtime";
 import { getDatabase } from "@/lib/db";
+import { verifiedPrimaryEmail } from "@/lib/auth-email";
 import { screens } from "@/lib/db/schema";
 import {
   authorizePlayerBootstrap,
@@ -46,7 +47,7 @@ export default async function PlayerPage({
 
   if (preview) {
     const user = await currentUser();
-    const email = user?.primaryEmailAddress?.emailAddress.toLowerCase();
+    const email = verifiedPrimaryEmail(user);
     if (!email || !controlRoomEmails.has(email)) notFound();
     const [screen] = await getDatabase()
       .select({

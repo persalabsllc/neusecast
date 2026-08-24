@@ -40,7 +40,10 @@ export async function GET(
         .values({ screenId: device.screenId, version: manifest.version, items: snapshotItems, deliveredAt: now })
         .onConflictDoUpdate({
           target: [playerManifestSnapshots.screenId, playerManifestSnapshots.version],
-          set: { items: snapshotItems, deliveredAt: now },
+          // Preserve the first delivery time for a manifest version. Repeated polls
+          // are screen-health activity, but they must not invalidate legitimate
+          // offline proof-of-play receipts queued after the original delivery.
+          set: { items: snapshotItems },
         }),
     ]);
 

@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getDatabase } from "@/lib/db";
+import { verifiedPrimaryEmail } from "@/lib/auth-email";
 import { ensureScreenManagementSchema } from "@/lib/db/ensure-screen-management";
 import { screens } from "@/lib/db/schema";
 import { createPlayerPairingToken, pairingCookieName } from "@/lib/player/pairing";
@@ -19,7 +20,7 @@ const controlRoomEmails = new Set(
 
 async function requireControlUser() {
   const user = await currentUser();
-  const email = user?.primaryEmailAddress?.emailAddress.toLowerCase();
+  const email = verifiedPrimaryEmail(user);
   if (!user || !email || !controlRoomEmails.has(email)) {
     throw new Error("Control Room authorization required.");
   }

@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getDatabase } from "@/lib/db";
+import { verifiedPrimaryEmail } from "@/lib/auth-email";
 import { ensureScreenManagementSchema } from "@/lib/db/ensure-screen-management";
 import { appUsers, screens, venues } from "@/lib/db/schema";
 import { createPlayerPairingToken, pairingCookieName } from "@/lib/player/pairing";
@@ -30,7 +31,7 @@ function timeZoneValue(formData: FormData) {
 
 async function requireControlUser() {
   const user = await currentUser();
-  const email = user?.primaryEmailAddress?.emailAddress.toLowerCase();
+  const email = verifiedPrimaryEmail(user);
   if (!user || !email || !controlRoomEmails.has(email)) throw new Error("Control Room authorization required.");
   return user;
 }
@@ -65,13 +66,28 @@ export async function activateScreen(formData: FormData) {
     : [];
   if (emailUser && (emailUser.role !== "host" || emailUser.status === "suspended")) redirect("/control/screens?error=host");
   const hostClerkUserId = selectedHost?.clerkUserId ?? emailUser?.clerkUserId ?? `invited:${hostEmail}`;
-  if (!selectedHost && !emailUser) await database.insert(appUsers).values({ clerkUserId: hostClerkUserId, email: hostEmail, displayName: hostName || venueName, role: "host", status: "invited" });
-
-  const [venue] = await database.insert(venues).values({ hostClerkUserId, name: venueName, venueType, addressLine1, addressLine2: addressLine2 || null, city, state, postalCode, market, timeZone, status: "active" }).returning({ id: venues.id });
+  const createHostInvitation = !selectedHost && !emailUser;
+  const venueId = randomUUID();
+  const screenId = randomUUID();
   const playerKey = `nc-${randomUUID().replaceAll("-", "").slice(0, 20)}`;
   const pairing = createPlayerPairingToken();
-  const [screen] = await database.insert(screens).values({
-    venueId: venue.id,
+  const venueInsert = database.insert(venues).values({
+    id: venueId,
+    hostClerkUserId,
+    name: venueName,
+    venueType,
+    addressLine1,
+    addressLine2: addressLine2 || null,
+    city,
+    state,
+    postalCode,
+    market,
+    timeZone,
+    status: "active",
+  });
+  const screenInsert = database.insert(screens).values({
+    id: screenId,
+    venueId,
     name: screenName,
     provider: "neusecast",
     providerScreenId: playerKey,
@@ -81,16 +97,29 @@ export async function activateScreen(formData: FormData) {
     active: true,
     pairingTokenHash: pairing.hash,
     pairingTokenExpiresAt: pairing.expiresAt,
-  }).returning({ id: screens.id });
-  (await cookies()).set(pairingCookieName(screen.id), pairing.token, {
+  });
+
+  // Neon HTTP batches are committed as one transaction. A failed activation cannot
+  // leave behind only an invitation or venue without its corresponding screen.
+  if (createHostInvitation) {
+    await database.batch([
+      database.insert(appUsers).values({ clerkUserId: hostClerkUserId, email: hostEmail, displayName: hostName || venueName, role: "host", status: "invited" }),
+      venueInsert,
+      screenInsert,
+    ] as const);
+  } else {
+    await database.batch([venueInsert, screenInsert] as const);
+  }
+
+  (await cookies()).set(pairingCookieName(screenId), pairing.token, {
     httpOnly: true,
     sameSite: "strict",
     secure: process.env.NODE_ENV === "production",
     maxAge: 15 * 60,
-    path: `/control/screens/${screen.id}`,
+    path: `/control/screens/${screenId}`,
   });
   revalidatePath("/control/screens");
-  redirect(`/control/screens/${screen.id}?created=1`);
+  redirect(`/control/screens/${screenId}?created=1`);
 }
 
 export async function setScreenActive(formData: FormData) {

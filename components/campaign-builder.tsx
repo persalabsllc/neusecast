@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useFormStatus } from "react-dom";
 import { ArrowRight, BadgeCheck, CreditCard, Eye, Sparkles } from "lucide-react";
 
 type CampaignBuilderProps = {
   action: (formData: FormData) => void | Promise<void>;
   campaignId?: string;
+  submissionId?: string;
   mode?: "checkout" | "included" | "revision";
   initial?: { name?: string; eyebrow?: string; headline?: string; body?: string; callToAction?: string; theme?: string };
 };
@@ -17,7 +19,24 @@ const themes = [
   { value: "gold", label: "Carolina gold" },
 ] as const;
 
-export function CampaignBuilder({ action, campaignId, mode = "checkout", initial = {} }: CampaignBuilderProps) {
+function CampaignSubmitButton({ mode }: { mode: NonNullable<CampaignBuilderProps["mode"]> }) {
+  const { pending } = useFormStatus();
+
+  return (
+    <button className="button button-primary creative-builder-submit" type="submit" disabled={pending}>
+      {pending ? (
+        <><Sparkles size={17} aria-hidden="true" /> Preparing your campaign…</>
+      ) : mode === "checkout" ? (
+        <><CreditCard size={17} aria-hidden="true" /> Continue to secure $75 checkout</>
+      ) : (
+        <><Sparkles size={17} aria-hidden="true" /> {mode === "included" ? "Add campaign to my plan" : "Submit changes for review"}</>
+      )}
+      <ArrowRight size={17} aria-hidden="true" />
+    </button>
+  );
+}
+
+export function CampaignBuilder({ action, campaignId, submissionId, mode = "checkout", initial = {} }: CampaignBuilderProps) {
   const [eyebrow, setEyebrow] = useState(initial.eyebrow ?? "");
   const [headline, setHeadline] = useState(initial.headline ?? "");
   const [body, setBody] = useState(initial.body ?? "");
@@ -27,6 +46,7 @@ export function CampaignBuilder({ action, campaignId, mode = "checkout", initial
   return (
     <form className="creative-builder" action={action}>
       {campaignId ? <input type="hidden" name="campaignId" value={campaignId} /> : null}
+      {submissionId ? <input type="hidden" name="submissionId" value={submissionId} /> : null}
       <section className="creative-builder-fields">
         <div className="form-heading"><span>Campaign studio</span><h2>Build your screen creative</h2><p>Every edit appears in the live preview. Keep it simple—the best screen ads can be understood in a few seconds.</p></div>
         <label className="field"><span className="field-label">Campaign name</span><input name="name" required maxLength={180} defaultValue={initial.name ?? ""} placeholder="Internal name for this campaign" /></label>
@@ -36,10 +56,7 @@ export function CampaignBuilder({ action, campaignId, mode = "checkout", initial
         <label className="field"><span className="field-label">Call to action</span><input name="callToAction" required maxLength={120} value={callToAction} placeholder="What should customers do next?" onChange={(event) => setCallToAction(event.target.value)} /></label>
         <label className="field"><span className="field-label">Visual style</span><select name="theme" value={theme} onChange={(event) => setTheme(event.target.value)}>{themes.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
         <div className="creative-builder-assurance"><BadgeCheck size={18} aria-hidden="true" /><p><strong>Creative help is included.</strong> Your draft enters review after checkout. We can polish it or contact you before it airs.</p></div>
-        <button className="button button-primary creative-builder-submit" type="submit">
-          {mode === "checkout" ? <><CreditCard size={17} aria-hidden="true" /> Continue to secure $75 checkout</> : <><Sparkles size={17} aria-hidden="true" /> {mode === "included" ? "Add campaign to my plan" : "Submit changes for review"}</>}
-          <ArrowRight size={17} aria-hidden="true" />
-        </button>
+        <CampaignSubmitButton mode={mode} />
         {mode === "checkout" ? <p className="creative-billing-note">$75/month until canceled. Your campaign is scheduled for the next broadcast day after successful payment, subject to content review.</p> : mode === "included" ? <p className="creative-billing-note">Included with your active all-screen plan. No additional charge.</p> : null}
       </section>
       <aside className="creative-preview-panel">

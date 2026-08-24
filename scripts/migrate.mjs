@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
-import { migrate } from "drizzle-orm/neon-http/migrator";
+import { readMigrationFiles } from "drizzle-orm/migrator";
 
 const databaseUrl = process.env.DATABASE_URL;
 
-if (!databaseUrl) {
+if (!databaseUrl && process.env.VERCEL === "1" && process.env.VERCEL_ENV === "production") {
+  throw new Error("DATABASE_URL is required for a production deployment.");
+} else if (!databaseUrl) {
   console.log("DATABASE_URL is not set; skipping database migrations for this build.");
 } else if (process.env.VERCEL === "1" && process.env.VERCEL_ENV !== "production") {
   console.log("Skipping database migrations for a non-production Vercel deployment.");
@@ -45,8 +46,54 @@ if (!databaseUrl) {
 
   try {
     console.log("Applying NeuseCast database migrations...");
-    const database = drizzle(client);
-    await migrate(database, { migrationsFolder: "./drizzle" });
+    await client`CREATE SCHEMA IF NOT EXISTS "drizzle"`;
+    await client`
+      CREATE TABLE IF NOT EXISTS "drizzle"."__drizzle_migrations" (
+        "id" serial PRIMARY KEY,
+        "hash" text NOT NULL,
+        "created_at" bigint
+      )
+    `;
+
+    const appliedRows = await client`
+      SELECT "hash", "created_at"
+      FROM "drizzle"."__drizzle_migrations"
+    `;
+    const appliedByTimestamp = new Map(
+      appliedRows.map((row) => [Number(row.created_at), row.hash]),
+    );
+    const migrationFiles = readMigrationFiles({ migrationsFolder: "./drizzle" });
+
+    for (const migration of migrationFiles) {
+      const appliedHash = appliedByTimestamp.get(migration.folderMillis);
+      if (appliedHash === migration.hash) continue;
+      if (appliedHash) {
+        throw new Error(`Migration ${migration.folderMillis} was already recorded with a different hash.`);
+      }
+
+      const statements = migration.sql.map((statement) => statement.trim()).filter(Boolean);
+      const renewed = await client`
+        UPDATE "neusecast_migration_lock"
+        SET "locked_until" = now() + interval '5 minutes'
+        WHERE "id" = 1 AND "owner" = ${owner}
+        RETURNING "owner"
+      `;
+      if (renewed[0]?.owner !== owner) {
+        throw new Error("The database migration lease expired before the next migration could start.");
+      }
+
+      // Every migration and its journal record commit together. If a deployment
+      // stops midway through DDL, Postgres rolls back that migration so the next
+      // deployment can retry safely instead of finding a partially applied file.
+      await client.transaction((transaction) => [
+        ...statements.map((statement) => transaction.query(statement)),
+        transaction`
+          INSERT INTO "drizzle"."__drizzle_migrations" ("hash", "created_at")
+          VALUES (${migration.hash}, ${migration.folderMillis})
+        `,
+      ]);
+      appliedByTimestamp.set(migration.folderMillis, migration.hash);
+    }
     console.log("NeuseCast database migrations are current.");
   } finally {
     await client`

@@ -1,24 +1,28 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { currentUser } from "@clerk/nextjs/server";
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { createCampaignCheckout, hasActiveAdvertiserSubscription, requiresAdvertiserBillingAction } from "@/lib/billing";
+import { verifiedPrimaryEmail } from "@/lib/auth-email";
 import { getDatabase } from "@/lib/db";
 import { advertiserAccounts, appUsers, campaignOrders, campaignScreens, campaigns, creatives, screens } from "@/lib/db/schema";
 import { NEUSECAST_PLAN } from "@/lib/pricing";
 import { getApplicationUrl, getStripe } from "@/lib/stripe";
+import { nextBroadcastMorning } from "@/lib/time-zone";
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
 function textValue(formData: FormData, key: string, maximumLength: number) {
   const value = formData.get(key);
   return typeof value === "string" ? value.trim().slice(0, maximumLength) : "";
 }
 
-function nextBroadcastMorning() {
-  const date = new Date();
-  date.setUTCDate(date.getUTCDate() + 1);
-  date.setUTCHours(10, 0, 0, 0);
-  return date;
+function isUniqueViolation(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as { code?: unknown; cause?: unknown };
+  return candidate.code === "23505" || (candidate.cause !== error && isUniqueViolation(candidate.cause));
 }
 
 async function scheduleIncludedCampaign(campaignId: string) {
@@ -33,7 +37,7 @@ async function scheduleIncludedCampaign(campaignId: string) {
 
 async function requireAdvertiserUser() {
   const user = await currentUser();
-  const email = user?.primaryEmailAddress?.emailAddress?.toLowerCase();
+  const email = verifiedPrimaryEmail(user);
 
   if (!user || !email) redirect("/sign-in?redirect_url=/advertiser");
   return { user, email };
@@ -70,21 +74,25 @@ export async function createAdvertiserAccount(formData: FormData) {
     })
     .onConflictDoNothing();
 
-  const [existingAccount] = await database
-    .select({ id: advertiserAccounts.id })
-    .from(advertiserAccounts)
-    .where(eq(advertiserAccounts.ownerClerkUserId, user.id))
-    .limit(1);
-
-  if (!existingAccount) {
-    await database.insert(advertiserAccounts).values({
+  await database
+    .insert(advertiserAccounts)
+    .values({
       ownerClerkUserId: user.id,
       businessName,
       billingEmail,
       phone: phone || null,
       website: website || null,
+    })
+    .onConflictDoUpdate({
+      target: advertiserAccounts.ownerClerkUserId,
+      set: {
+        businessName,
+        billingEmail,
+        phone: phone || null,
+        website: website || null,
+        updatedAt: new Date(),
+      },
     });
-  }
 
   redirect("/advertiser?welcome=1");
 }
@@ -110,6 +118,7 @@ export async function createCampaignAndCheckout(formData: FormData) {
 
   if (!account) redirect("/advertiser?error=account-required");
 
+  const submissionId = textValue(formData, "submissionId", 36);
   const name = textValue(formData, "name", 180);
   const headline = textValue(formData, "headline", 120);
   const body = textValue(formData, "body", 500);
@@ -117,7 +126,9 @@ export async function createCampaignAndCheckout(formData: FormData) {
   const eyebrow = textValue(formData, "eyebrow", 50) || "Local business";
   const theme = textValue(formData, "theme", 20) || "aqua";
 
-  if (!name || !headline || !body || !callToAction) redirect("/advertiser/new?error=campaign-details");
+  if (!UUID_PATTERN.test(submissionId) || !name || !headline || !body || !callToAction) {
+    redirect("/advertiser/new?error=campaign-details");
+  }
 
   if (requiresAdvertiserBillingAction(account.subscriptionStatus)) {
     await redirectToBillingPortal(account.stripeCustomerId);
@@ -135,7 +146,7 @@ export async function createCampaignAndCheckout(formData: FormData) {
     .limit(1);
 
   if (!hasActiveAdvertiserSubscription(account.subscriptionStatus) && pendingOrder) {
-    await database.update(campaigns).set({
+    const campaignUpdate = database.update(campaigns).set({
       name,
       objective: body,
       status: "payment_pending",
@@ -154,7 +165,7 @@ export async function createCampaignAndCheckout(formData: FormData) {
       .limit(1);
 
     if (draftCreative) {
-      await database.update(creatives).set({
+      const creativeUpdate = database.update(creatives).set({
         name,
         headline,
         body,
@@ -162,8 +173,9 @@ export async function createCampaignAndCheckout(formData: FormData) {
         metadata: { eyebrow, theme, sponsor: account.businessName },
         updatedAt: new Date(),
       }).where(eq(creatives.id, draftCreative.id));
+      await database.batch([campaignUpdate, creativeUpdate] as const);
     } else {
-      await database.insert(creatives).values({
+      const creativeInsert = database.insert(creatives).values({
         campaignId: pendingOrder.campaignId,
         createdByClerkUserId: user.id,
         type: "generated_slide",
@@ -174,25 +186,29 @@ export async function createCampaignAndCheckout(formData: FormData) {
         callToAction,
         metadata: { eyebrow, theme, sponsor: account.businessName },
       });
+      await database.batch([campaignUpdate, creativeInsert] as const);
     }
 
     redirect(await createCampaignCheckout(pendingOrder.id, user.id));
   }
 
-  const [campaign] = await database.insert(campaigns).values({
+  const hasActiveSubscription = hasActiveAdvertiserSubscription(account.subscriptionStatus);
+  const orderId = randomUUID();
+  const campaignInsert = database.insert(campaigns).values({
+    id: submissionId,
     advertiserAccountId: account.id,
     createdByClerkUserId: user.id,
     name,
     objective: body,
-    status: "draft",
+    status: hasActiveSubscription ? "draft" : "payment_pending",
     targeting: { markets: ["Eastern Carolina"], notes: "All active NeuseCast screens" },
     subtotalCents: NEUSECAST_PLAN.amountCents,
     totalCents: NEUSECAST_PLAN.amountCents,
     currency: NEUSECAST_PLAN.currency,
-  }).returning({ id: campaigns.id });
+  });
 
-  await database.insert(creatives).values({
-    campaignId: campaign.id,
+  const creativeInsert = database.insert(creatives).values({
+    campaignId: submissionId,
     createdByClerkUserId: user.id,
     type: "generated_slide",
     status: "draft",
@@ -203,19 +219,60 @@ export async function createCampaignAndCheckout(formData: FormData) {
     metadata: { eyebrow, theme, sponsor: account.businessName },
   });
 
-  if (hasActiveAdvertiserSubscription(account.subscriptionStatus)) {
-    await scheduleIncludedCampaign(campaign.id);
-    redirect("/advertiser?created=1");
-  }
-
-  const [order] = await database.insert(campaignOrders).values({
-    campaignId: campaign.id,
+  const orderInsert = database.insert(campaignOrders).values({
+    id: orderId,
+    campaignId: submissionId,
     advertiserAccountId: account.id,
     amountCents: NEUSECAST_PLAN.amountCents,
     currency: NEUSECAST_PLAN.currency,
-  }).returning({ id: campaignOrders.id });
+  });
 
-  const checkoutUrl = await createCampaignCheckout(order.id, user.id);
+  let uniqueConflict: unknown = null;
+  try {
+    if (hasActiveSubscription) {
+      await database.batch([campaignInsert, creativeInsert] as const);
+    } else {
+      await database.batch([campaignInsert, creativeInsert, orderInsert] as const);
+    }
+  } catch (error) {
+    if (!isUniqueViolation(error)) throw error;
+    uniqueConflict = error;
+  }
+
+  if (uniqueConflict) {
+    if (hasActiveSubscription) {
+      const [existingCampaign] = await database
+        .select({ id: campaigns.id })
+        .from(campaigns)
+        .where(and(eq(campaigns.id, submissionId), eq(campaigns.advertiserAccountId, account.id)))
+        .limit(1);
+      if (existingCampaign) {
+        await scheduleIncludedCampaign(existingCampaign.id);
+        redirect("/advertiser?created=1");
+      }
+    } else {
+      const [recoveredOrder] = await database
+        .select({ id: campaignOrders.id })
+        .from(campaignOrders)
+        .where(and(
+          eq(campaignOrders.advertiserAccountId, account.id),
+          inArray(campaignOrders.status, ["pending", "failed"]),
+          isNull(campaignOrders.stripePaymentIntentId),
+        ))
+        .orderBy(desc(campaignOrders.createdAt))
+        .limit(1);
+      if (recoveredOrder) redirect(await createCampaignCheckout(recoveredOrder.id, user.id));
+    }
+
+    throw uniqueConflict;
+  }
+
+  if (hasActiveSubscription) {
+    await scheduleIncludedCampaign(submissionId);
+    redirect("/advertiser?created=1");
+  }
+
+  const checkoutUrl = await createCampaignCheckout(orderId, user.id);
   redirect(checkoutUrl);
 }
 

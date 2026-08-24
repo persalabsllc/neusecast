@@ -3,6 +3,7 @@ import { and, eq, ne, sql } from "drizzle-orm";
 import { getDatabase } from "@/lib/db";
 import { campaignOrders } from "@/lib/db/schema";
 import { getStripe } from "@/lib/stripe";
+import { nextBroadcastMorning } from "@/lib/time-zone";
 
 function idFromExpandable(value: string | { id: string } | null) {
   if (!value) return null;
@@ -15,7 +16,11 @@ function metadataUuid(value: string | undefined) {
     : null;
 }
 
-async function fulfillCheckout(session: Stripe.Checkout.Session) {
+function stripeEventDate(eventCreated: number) {
+  return new Date(eventCreated * 1_000);
+}
+
+async function fulfillCheckout(session: Stripe.Checkout.Session, eventCreated: number) {
   if (session.payment_status !== "paid") return;
 
   const orderId = session.metadata?.orderId;
@@ -53,10 +58,8 @@ async function fulfillCheckout(session: Stripe.Checkout.Session) {
   }
 
   const paymentIntentId = idFromExpandable(session.payment_intent);
-  const tomorrowMorning = new Date();
-  tomorrowMorning.setUTCDate(tomorrowMorning.getUTCDate() + 1);
-  tomorrowMorning.setUTCHours(10, 0, 0, 0);
-  const paidAt = new Date();
+  const paidAt = stripeEventDate(eventCreated);
+  const tomorrowMorning = nextBroadcastMorning(paidAt);
 
   // Neon HTTP does not expose interactive transactions. A single data-modifying CTE keeps
   // the initial order, account entitlement, campaign, creative, and screen assignment
@@ -77,23 +80,6 @@ async function fulfillCheckout(session: Stripe.Checkout.Session) {
         AND orders.campaign_id = ${order.campaignId}::uuid
         AND orders.advertiser_account_id = ${order.advertiserAccountId}::uuid
         AND orders.stripe_checkout_session_id = ${session.id}
-        AND (
-          accounts.stripe_subscription_id IS NULL
-          OR (
-            accounts.stripe_subscription_id = ${subscriptionId}
-            AND (
-              accounts.subscription_status IN ('inactive', 'active', 'trialing')
-              OR (
-                orders.status <> 'paid'::order_status
-                AND accounts.subscription_status IN ('past_due', 'unpaid')
-              )
-            )
-          )
-          OR (
-            accounts.stripe_subscription_id IS DISTINCT FROM ${subscriptionId}
-            AND accounts.subscription_status IN ('inactive', 'past_due', 'unpaid', 'canceled')
-          )
-        )
       LIMIT 1
     ),
     paid_order AS (
@@ -124,9 +110,14 @@ async function fulfillCheckout(session: Stripe.Checkout.Session) {
         stripe_customer_id = ${customerId},
         stripe_subscription_id = ${subscriptionId},
         subscription_status = 'active',
+        stripe_event_created_at = ${paidAt},
         updated_at = ${paidAt}
       FROM fulfillment_context AS context
       WHERE accounts.id = context.advertiser_account_id
+        AND (
+          accounts.stripe_event_created_at IS NULL
+          OR accounts.stripe_event_created_at <= ${paidAt}
+        )
         AND (
           accounts.stripe_subscription_id IS NULL
           OR (
@@ -141,6 +132,7 @@ async function fulfillCheckout(session: Stripe.Checkout.Session) {
           )
           OR (
             accounts.stripe_subscription_id IS DISTINCT FROM ${subscriptionId}
+            AND context.previous_order_status <> 'paid'::order_status
             AND accounts.subscription_status IN ('inactive', 'past_due', 'unpaid', 'canceled')
           )
         )
@@ -253,12 +245,12 @@ async function fulfillCheckout(session: Stripe.Checkout.Session) {
   `);
 }
 
-async function markCheckoutFailed(session: Stripe.Checkout.Session) {
+async function markCheckoutFailed(session: Stripe.Checkout.Session, eventCreated: number) {
   const orderId = session.metadata?.orderId;
   if (!orderId) return;
   await getDatabase()
     .update(campaignOrders)
-    .set({ status: "failed", updatedAt: new Date() })
+    .set({ status: "failed", updatedAt: stripeEventDate(eventCreated) })
     .where(and(
       eq(campaignOrders.id, orderId),
       eq(campaignOrders.stripeCheckoutSessionId, session.id),
@@ -266,9 +258,9 @@ async function markCheckoutFailed(session: Stripe.Checkout.Session) {
     ));
 }
 
-async function cancelSubscription(subscription: Stripe.Subscription) {
+async function cancelSubscription(subscription: Stripe.Subscription, eventCreated: number) {
   const advertiserAccountId = metadataUuid(subscription.metadata?.advertiserAccountId);
-  const changedAt = new Date();
+  const changedAt = stripeEventDate(eventCreated);
 
   await getDatabase().execute(sql`
     WITH account_state AS (
@@ -276,18 +268,19 @@ async function cancelSubscription(subscription: Stripe.Subscription) {
       SET
         stripe_subscription_id = ${subscription.id},
         subscription_status = 'canceled',
+        stripe_event_created_at = ${changedAt},
         updated_at = ${changedAt}
-      WHERE accounts.stripe_subscription_id = ${subscription.id}
-        OR (
-          ${advertiserAccountId}::uuid IS NOT NULL
-          AND accounts.id = ${advertiserAccountId}::uuid
-          AND (
-            accounts.stripe_subscription_id IS NULL
-            OR (
-              accounts.stripe_subscription_id IS DISTINCT FROM ${subscription.id}
-              AND accounts.subscription_status IN ('inactive', 'past_due', 'unpaid', 'canceled')
-            )
+      WHERE (
+          accounts.stripe_subscription_id = ${subscription.id}
+          OR (
+            ${advertiserAccountId}::uuid IS NOT NULL
+            AND accounts.id = ${advertiserAccountId}::uuid
+            AND accounts.stripe_subscription_id IS NULL
           )
+        )
+        AND (
+          accounts.stripe_event_created_at IS NULL
+          OR accounts.stripe_event_created_at <= ${changedAt}
         )
       RETURNING accounts.id
     ),
@@ -323,11 +316,11 @@ function invoiceSubscriptionId(invoice: Stripe.Invoice) {
   return idFromExpandable(value.subscription ?? value.parent?.subscription_details?.subscription ?? null);
 }
 
-async function setSubscriptionPaymentState(invoice: Stripe.Invoice, paid: boolean) {
+async function setSubscriptionPaymentState(invoice: Stripe.Invoice, paid: boolean, eventCreated: number) {
   const subscriptionId = invoiceSubscriptionId(invoice);
   if (!subscriptionId) return;
   const customerId = idFromExpandable(invoice.customer);
-  const changedAt = new Date();
+  const changedAt = stripeEventDate(eventCreated);
 
   if (!paid) {
     await getDatabase().execute(sql`
@@ -336,6 +329,7 @@ async function setSubscriptionPaymentState(invoice: Stripe.Invoice, paid: boolea
         SET
           stripe_subscription_id = ${subscriptionId},
           subscription_status = 'past_due',
+          stripe_event_created_at = ${changedAt},
           updated_at = ${changedAt}
         WHERE (
           accounts.stripe_subscription_id = ${subscriptionId}
@@ -344,6 +338,10 @@ async function setSubscriptionPaymentState(invoice: Stripe.Invoice, paid: boolea
             AND accounts.stripe_customer_id = ${customerId}
           )
         )
+          AND (
+            accounts.stripe_event_created_at IS NULL
+            OR accounts.stripe_event_created_at <= ${changedAt}
+          )
           AND accounts.subscription_status <> 'canceled'
         RETURNING accounts.id
       ),
@@ -376,6 +374,7 @@ async function setSubscriptionPaymentState(invoice: Stripe.Invoice, paid: boolea
       SET
         stripe_subscription_id = ${subscriptionId},
         subscription_status = 'active',
+        stripe_event_created_at = ${changedAt},
         updated_at = ${changedAt}
       WHERE (
         accounts.stripe_subscription_id = ${subscriptionId}
@@ -384,6 +383,10 @@ async function setSubscriptionPaymentState(invoice: Stripe.Invoice, paid: boolea
           AND accounts.stripe_customer_id = ${customerId}
         )
       )
+        AND (
+          accounts.stripe_event_created_at IS NULL
+          OR accounts.stripe_event_created_at <= ${changedAt}
+        )
         AND accounts.subscription_status <> 'canceled'
       RETURNING accounts.id
     ),
@@ -426,15 +429,15 @@ export async function POST(request: Request) {
 
   try {
     if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") {
-      await fulfillCheckout(event.data.object);
+      await fulfillCheckout(event.data.object, event.created);
     } else if (event.type === "checkout.session.expired" || event.type === "checkout.session.async_payment_failed") {
-      await markCheckoutFailed(event.data.object);
+      await markCheckoutFailed(event.data.object, event.created);
     } else if (event.type === "customer.subscription.deleted") {
-      await cancelSubscription(event.data.object);
+      await cancelSubscription(event.data.object, event.created);
     } else if (event.type === "invoice.payment_failed") {
-      await setSubscriptionPaymentState(event.data.object, false);
+      await setSubscriptionPaymentState(event.data.object, false, event.created);
     } else if (event.type === "invoice.paid") {
-      await setSubscriptionPaymentState(event.data.object, true);
+      await setSubscriptionPaymentState(event.data.object, true, event.created);
     }
   } catch (error) {
     console.error(`Failed to process Stripe event ${event.id}`, error);
