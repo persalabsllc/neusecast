@@ -164,9 +164,9 @@ export function AppShell({ children }: AppShellProps) {
           </div>
 
           <div className="topbar-actions">
-            <span className="sync-status" title="NeuseCast services connected">
-              <span className="status-dot status-dot-online" aria-hidden="true" />
-              Live network
+            <span className="sync-status" title="Screen health is shown on the live dashboard">
+              <RadioTower size={14} aria-hidden="true" />
+              Fleet monitoring
             </span>
             <UserButton />
           </div>

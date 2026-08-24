@@ -27,8 +27,8 @@ export const metadata: Metadata = {
 const advertiserBenefits = [
   {
     icon: Target,
-    title: "Choose your market",
-    copy: "Focus on the towns, venue types, and locations that matter to your business.",
+    title: "Cover the whole network",
+    copy: "One transparent plan places your campaign on every active NeuseCast screen.",
   },
   {
     icon: Palette,
@@ -43,7 +43,7 @@ const advertiserBenefits = [
   {
     icon: BarChart3,
     title: "Understand your placement",
-    copy: "Know the markets, screens, dates, and scheduled plays included in your campaign.",
+    copy: "See the screens, dates, and verified plays delivered by your campaign.",
   },
 ] as const;
 
@@ -299,7 +299,7 @@ export default function Home() {
           </details>
           <details>
             <summary>Can hosts control what appears in their venue?<ChevronRight size={17} aria-hidden="true" /></summary>
-            <p>Hosts can submit their own content and establish appropriate advertising-category restrictions.</p>
+            <p>Hosts can publish local content directly to their own screen and establish appropriate advertiser restrictions for that venue.</p>
           </details>
           <details>
             <summary>Where will my campaign appear?<ChevronRight size={17} aria-hidden="true" /></summary>

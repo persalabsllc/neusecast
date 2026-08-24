@@ -1,88 +1,73 @@
 # NeuseCast
 
-NeuseCast is the operating platform for an Eastern North Carolina digital screen network: useful local content for host businesses, targeted campaigns for advertisers, and one control room for Persa Labs.
+NeuseCast is Persa Labs' end-to-end operating platform for an Eastern North Carolina digital screen network.
 
-> Local businesses. Local stories. On screen.
+## Launch workflow
 
-## Current milestone
+- Advertisers create an account, enter business details, design and preview a campaign, and subscribe through Stripe for **$75/month**.
+- The plan includes every active NeuseCast screen. Additional campaigns are included while the advertiser's plan remains active.
+- Paid creative enters the Control Room review queue and is scheduled for the following broadcast day. It cannot air until a NeuseCast administrator approves it.
+- Hosts publish venue-only specials, menus, events, and announcements directly to their own assigned screens.
+- Control Room administrators create venues and permanent player URLs, issue one-time device pairing links, assign host accounts, block venue conflicts, and monitor heartbeats, playlist delivery, device details, and proof-of-play.
+- The Content workspace manages manual and source-backed automatic filler, including local history, weather, news, events, facts, and on-this-day cards. A protected NeuseCast house promotion is always included in active screen rotations.
+- Screen players use NeuseCast's first-party web runtime with offline caching, server-synchronized local time, secure device credentials, playlist refreshes, and playback telemetry.
 
-This repository now contains the first production-shaped application foundation:
+There is no seeded or synthetic launch data. New accounts, venues, screens, campaigns, content, and delivery results come from real user activity.
 
-- a network Control Room dashboard
-- screen-fleet monitoring
-- content review and approval views
-- campaign and playlist management views
-- a local-host portal with graphical content previews
-- Clerk sign-in and protected host/control routes
-- a database-driven rotating player at `/player/demo-new-bern`
-- a Neon/Drizzle schema for accounts, venues, screens, content, campaigns, playlists, billing references, and proof-of-play
-- realistic demo content so the complete on-screen experience can be evaluated before live feeds are connected
+## Stack
 
-The live player now reads its assigned rotation from Neon, refreshes its manifest automatically, sends a heartbeat, and records proof-of-play events. The control dashboards still use representative demo metrics while their forms are connected to the same data model. Stripe checkout and automated feeds remain the next integration layer.
-
-## Planned architecture
-
-| Capability | Planned service |
+| Capability | Service |
 | --- | --- |
-| Web app and API | Next.js on Vercel |
-| Accounts and organizations | Clerk |
-| Relational data | Neon Postgres |
-| Images and creative files | Vercel Blob |
-| Screen playback | NeuseCast web player, with optional Yodeck device management |
-| Scheduled feed refreshes | Vercel Cron |
-| AI-assisted card generation | Structured model output with reviewed templates |
-| Source and deployment | GitHub → Vercel |
+| Web application and APIs | Next.js on Vercel |
+| Authentication | Clerk |
+| Relational data | Neon Postgres with Drizzle ORM |
+| Advertiser subscriptions | Stripe Checkout and webhooks |
+| Creative media | Vercel Blob |
+| Screen playback | Proprietary NeuseCast web player |
+| Source and deployments | GitHub to Vercel |
 
-## Roles
+## Access roles
 
-- **Network admin:** manages the full screen fleet, campaigns, content, schedules, and approvals.
-- **Host business:** submits and schedules venue-specific specials, menus, events, and announcements.
-- **Advertiser:** will review campaign status and proof-of-play reporting in a later milestone.
-- **Screen player:** receives an assigned playlist and reports playback/health telemetry.
+- **Admin:** full Control Room access, screen activation, network rules, campaign moderation, and delivery reporting.
+- **Host:** direct publishing and advertiser exclusions only for screens assigned to that host.
+- **Advertiser:** business onboarding, campaign creation and revision, billing, status, and verified delivery results.
+- **Player:** device-bound access to one screen's manifest, heartbeat endpoint, and proof-of-play endpoint.
 
-## Run locally
+## Local development
 
-Requirements: Node.js 20.9 or newer.
+Node.js 20.9 or newer is required.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Then open [http://localhost:3000](http://localhost:3000).
-
-Production validation:
-
-```bash
-npm run lint
-npm run build
-```
-
-Open [http://localhost:3000/player/demo-new-bern](http://localhost:3000/player/demo-new-bern) to run the seeded TV player after connecting the database.
-
-## Environment setup
-
-Copy `.env.example` to `.env.local` once the integrations are provisioned. Never commit live credentials.
-
-After the Vercel Marketplace Neon integration supplies `DATABASE_URL`, initialize the database with:
+Copy `.env.example` to `.env.local`, provide development integration credentials, and initialize a new database with:
 
 ```bash
 npm run db:migrate
 ```
 
-## Delivery sequence
+Validation commands:
 
-1. Interface foundation and workflow prototype — complete
-2. Clerk authentication and protected portal access — complete
-3. Full-screen web player and reusable content templates — complete foundation
-4. Neon core persistence and live player telemetry — complete foundation
-5. Stripe checkout and advertiser billing status
-6. Player assignments, offline caching, and screen heartbeat monitoring
-7. Weather, tides, community-event, and local-news feeds
-8. Content automation with approval rules and advertiser reporting
+```bash
+npm run lint
+npx tsc --noEmit
+npm run build
+```
 
-## Brand
+## Production configuration
 
-- **Name:** NeuseCast
-- **Descriptor:** Eastern Carolina's Local Screen Network
-- **Tagline:** Local businesses. Local stories. On screen.
+Vercel must provide the Clerk, Neon, Stripe, and application URL environment variables listed in `.env.example`. Stripe sends subscription and Checkout events to `/api/stripe/webhook`. After the custom domain is connected, update `NEXT_PUBLIC_APP_URL`, configure the production domain in Clerk, and issue fresh player pairing links for devices moving from the Vercel domain.
+
+Automatic filler uses the OpenAI Responses API with live web search and structured output. Set `OPENAI_API_KEY`, optionally override `OPENAI_FILLER_MODEL`, and keep `CRON_SECRET` configured so Vercel can authenticate the daily `/api/cron/filler` refresh and three-hour `/api/cron/filler/weather` refresh. Administrators can also run the same generator on demand from Control Room → Content.
+
+Before taking the first live advertiser payment:
+
+1. In Stripe's live Customer Portal configuration, allow customers to update payment methods and cancel subscriptions. Prefer cancellation at the end of the paid billing period.
+2. Confirm the production webhook destination includes `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `checkout.session.expired`, `customer.subscription.deleted`, `invoice.payment_failed`, and `invoice.paid`.
+3. Confirm `STRIPE_WEBHOOK_SECRET` is the signing secret for that exact live webhook destination and redeploy production after changing it.
+
+Database migrations run automatically before each Vercel build. Application requests never create, alter, seed, or delete database schema/data.
+
+Never commit live credentials or player pairing links.

@@ -4,7 +4,7 @@ import { and, eq, ne } from "drizzle-orm";
 import { currentUser } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { getDatabase } from "@/lib/db";
-import { campaigns, creatives } from "@/lib/db/schema";
+import { advertiserAccounts, campaigns, creatives } from "@/lib/db/schema";
 
 const controlRoomEmails = new Set(
   (process.env.CONTROL_ROOM_EMAILS ?? "persalabsllc@gmail.com")
@@ -26,12 +26,38 @@ export async function approveCreative(formData: FormData) {
   if (!creativeId || !campaignId) return;
   const database = getDatabase();
 
-  await database.update(creatives).set({ status: "archived", updatedAt: new Date() }).where(and(eq(creatives.campaignId, campaignId), eq(creatives.status, "approved"), ne(creatives.id, creativeId)));
-  await database.update(creatives).set({ status: "approved", updatedAt: new Date() }).where(and(eq(creatives.id, creativeId), eq(creatives.campaignId, campaignId)));
+  const [eligibleCreative] = await database
+    .select({
+      startsAt: campaigns.startsAt,
+      billingPaused: campaigns.billingPaused,
+      advertiserActive: advertiserAccounts.active,
+      subscriptionStatus: advertiserAccounts.subscriptionStatus,
+    })
+    .from(creatives)
+    .innerJoin(campaigns, eq(creatives.campaignId, campaigns.id))
+    .innerJoin(advertiserAccounts, eq(campaigns.advertiserAccountId, advertiserAccounts.id))
+    .where(and(
+      eq(creatives.id, creativeId),
+      eq(creatives.campaignId, campaignId),
+      eq(creatives.status, "review"),
+    ))
+    .limit(1);
 
-  const [campaign] = await database.select({ startsAt: campaigns.startsAt }).from(campaigns).where(eq(campaigns.id, campaignId)).limit(1);
-  const status = campaign?.startsAt && campaign.startsAt <= new Date() ? "active" : "scheduled";
-  await database.update(campaigns).set({ status, updatedAt: new Date() }).where(eq(campaigns.id, campaignId));
+  if (
+    !eligibleCreative
+    || !eligibleCreative.advertiserActive
+    || eligibleCreative.subscriptionStatus !== "active"
+    || eligibleCreative.billingPaused
+  ) {
+    revalidatePath("/control/campaigns");
+    return;
+  }
+
+  await database.update(creatives).set({ status: "archived", updatedAt: new Date() }).where(and(eq(creatives.campaignId, campaignId), eq(creatives.status, "approved"), ne(creatives.id, creativeId)));
+  await database.update(creatives).set({ status: "approved", updatedAt: new Date() }).where(and(eq(creatives.id, creativeId), eq(creatives.campaignId, campaignId), eq(creatives.status, "review")));
+
+  const status = eligibleCreative.startsAt && eligibleCreative.startsAt <= new Date() ? "active" : "scheduled";
+  await database.update(campaigns).set({ status, updatedAt: new Date() }).where(and(eq(campaigns.id, campaignId), eq(campaigns.billingPaused, false)));
   revalidatePath("/control/campaigns");
 }
 

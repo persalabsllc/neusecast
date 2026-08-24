@@ -63,12 +63,15 @@ export const advertiserAccounts = pgTable(
     phone: varchar("phone", { length: 40 }),
     website: text("website"),
     stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
+    stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
+    subscriptionStatus: varchar("subscription_status", { length: 32 }).default("inactive").notNull(),
     active: boolean("active").default(true).notNull(),
     ...timestamps,
   },
   (table) => [
     index("advertiser_owner_idx").on(table.ownerClerkUserId),
     uniqueIndex("advertiser_stripe_customer_idx").on(table.stripeCustomerId),
+    uniqueIndex("advertiser_stripe_subscription_idx").on(table.stripeSubscriptionId),
   ],
 );
 
@@ -85,6 +88,7 @@ export const venues = pgTable(
     state: varchar("state", { length: 2 }).default("NC").notNull(),
     postalCode: varchar("postal_code", { length: 12 }).notNull(),
     market: varchar("market", { length: 100 }).notNull(),
+    timeZone: varchar("time_zone", { length: 64 }).default("America/New_York").notNull(),
     audienceDescription: text("audience_description"),
     estimatedDailyViews: integer("estimated_daily_views"),
     status: venueStatus("status").default("lead").notNull(),
@@ -104,18 +108,58 @@ export const screens = pgTable(
       .notNull()
       .references(() => venues.id, { onDelete: "cascade" }),
     name: varchar("name", { length: 160 }).notNull(),
-    provider: varchar("provider", { length: 60 }).default("yodeck").notNull(),
+    provider: varchar("provider", { length: 60 }).default("neusecast").notNull(),
     providerScreenId: varchar("provider_screen_id", { length: 255 }),
     orientation: varchar("orientation", { length: 20 }).default("landscape").notNull(),
     monthlyPriceCents: integer("monthly_price_cents").notNull(),
     status: screenStatus("status").default("pending").notNull(),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+    deviceId: varchar("device_id", { length: 128 }),
+    deviceCredentialHash: varchar("device_credential_hash", { length: 64 }),
+    deviceClaimedAt: timestamp("device_claimed_at", { withTimezone: true }),
+    pairingTokenHash: varchar("pairing_token_hash", { length: 64 }),
+    pairingTokenExpiresAt: timestamp("pairing_token_expires_at", { withTimezone: true }),
+    lastHeartbeatAt: timestamp("last_heartbeat_at", { withTimezone: true }),
+    lastManifestAt: timestamp("last_manifest_at", { withTimezone: true }),
+    lastManifestVersion: varchar("last_manifest_version", { length: 64 }),
+    lastPlaybackAt: timestamp("last_playback_at", { withTimezone: true }),
+    currentItemId: varchar("current_item_id", { length: 255 }),
+    currentManifestVersion: varchar("current_manifest_version", { length: 64 }),
+    playerVersion: varchar("player_version", { length: 80 }),
+    sessionId: varchar("session_id", { length: 128 }),
+    viewportWidth: integer("viewport_width"),
+    viewportHeight: integer("viewport_height"),
+    lastError: text("last_error"),
+    lastErrorAt: timestamp("last_error_at", { withTimezone: true }),
     active: boolean("active").default(true).notNull(),
     ...timestamps,
   },
   (table) => [
     index("screens_venue_idx").on(table.venueId),
+    index("screens_last_heartbeat_idx").on(table.lastHeartbeatAt),
     uniqueIndex("screens_provider_id_idx").on(table.provider, table.providerScreenId),
+  ],
+);
+
+export const playerManifestSnapshots = pgTable(
+  "player_manifest_snapshots",
+  {
+    screenId: uuid("screen_id")
+      .notNull()
+      .references(() => screens.id, { onDelete: "cascade" }),
+    version: varchar("version", { length: 64 }).notNull(),
+    items: jsonb("items").$type<Array<{
+      id: string;
+      source: "creative" | "host_content" | "generated_content";
+      campaignId: string | null;
+      creativeId: string | null;
+      durationSeconds: number;
+    }>>().notNull(),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.screenId, table.version] }),
+    index("player_manifest_snapshots_delivery_idx").on(table.deliveredAt),
   ],
 );
 
@@ -162,6 +206,7 @@ export const campaigns = pgTable(
     subtotalCents: integer("subtotal_cents").default(0).notNull(),
     totalCents: integer("total_cents").default(0).notNull(),
     currency: varchar("currency", { length: 3 }).default("USD").notNull(),
+    billingPaused: boolean("billing_paused").default(false).notNull(),
     ...timestamps,
   },
   (table) => [

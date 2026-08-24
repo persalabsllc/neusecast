@@ -4,16 +4,28 @@ import { randomUUID } from "node:crypto";
 import { currentUser } from "@clerk/nextjs/server";
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getDatabase } from "@/lib/db";
 import { ensureScreenManagementSchema } from "@/lib/db/ensure-screen-management";
 import { appUsers, screens, venues } from "@/lib/db/schema";
+import { createPlayerPairingToken, pairingCookieName } from "@/lib/player/pairing";
 
 const controlRoomEmails = new Set((process.env.CONTROL_ROOM_EMAILS ?? "persalabsllc@gmail.com").split(",").map((email) => email.trim().toLowerCase()).filter(Boolean));
 
 function value(formData: FormData, key: string, max = 200) {
   const raw = formData.get(key);
   return typeof raw === "string" ? raw.trim().slice(0, max) : "";
+}
+
+function timeZoneValue(formData: FormData) {
+  const candidate = value(formData, "timeZone", 64) || "America/New_York";
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: candidate }).format();
+    return candidate;
+  } catch {
+    return "America/New_York";
+  }
 }
 
 async function requireControlUser() {
@@ -37,6 +49,7 @@ export async function activateScreen(formData: FormData) {
   const state = value(formData, "state", 2).toUpperCase() || "NC";
   const postalCode = value(formData, "postalCode", 12);
   const market = value(formData, "market", 100);
+  const timeZone = timeZoneValue(formData);
   const screenName = value(formData, "screenName", 160);
   const orientation = value(formData, "orientation", 20) || "landscape";
   if ((!existingHostId && !hostEmail.includes("@")) || !venueName || !venueType || !addressLine1 || !city || !postalCode || !market || !screenName) redirect("/control/screens?error=required");
@@ -54,9 +67,28 @@ export async function activateScreen(formData: FormData) {
   const hostClerkUserId = selectedHost?.clerkUserId ?? emailUser?.clerkUserId ?? `invited:${hostEmail}`;
   if (!selectedHost && !emailUser) await database.insert(appUsers).values({ clerkUserId: hostClerkUserId, email: hostEmail, displayName: hostName || venueName, role: "host", status: "invited" });
 
-  const [venue] = await database.insert(venues).values({ hostClerkUserId, name: venueName, venueType, addressLine1, addressLine2: addressLine2 || null, city, state, postalCode, market, status: "active" }).returning({ id: venues.id });
+  const [venue] = await database.insert(venues).values({ hostClerkUserId, name: venueName, venueType, addressLine1, addressLine2: addressLine2 || null, city, state, postalCode, market, timeZone, status: "active" }).returning({ id: venues.id });
   const playerKey = `nc-${randomUUID().replaceAll("-", "").slice(0, 20)}`;
-  const [screen] = await database.insert(screens).values({ venueId: venue.id, name: screenName, provider: "neusecast", providerScreenId: playerKey, orientation, monthlyPriceCents: 0, status: "pending", active: true }).returning({ id: screens.id });
+  const pairing = createPlayerPairingToken();
+  const [screen] = await database.insert(screens).values({
+    venueId: venue.id,
+    name: screenName,
+    provider: "neusecast",
+    providerScreenId: playerKey,
+    orientation,
+    monthlyPriceCents: 0,
+    status: "pending",
+    active: true,
+    pairingTokenHash: pairing.hash,
+    pairingTokenExpiresAt: pairing.expiresAt,
+  }).returning({ id: screens.id });
+  (await cookies()).set(pairingCookieName(screen.id), pairing.token, {
+    httpOnly: true,
+    sameSite: "strict",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 15 * 60,
+    path: `/control/screens/${screen.id}`,
+  });
   revalidatePath("/control/screens");
   redirect(`/control/screens/${screen.id}?created=1`);
 }

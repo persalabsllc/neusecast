@@ -1,9 +1,10 @@
-import { and, eq, inArray, isNull, lte, or, gte } from "drizzle-orm";
+import { createHash } from "node:crypto";
+import { and, desc, eq, inArray, isNull, lte, or, gte } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { getDatabase } from "@/lib/db";
 import {
   campaigns,
-  campaignScreens,
+  advertiserAccounts,
   creatives,
   generatedContent,
   hostContent,
@@ -12,8 +13,9 @@ import {
   venues,
 } from "@/lib/db/schema";
 import { ensureScreenManagementSchema } from "@/lib/db/ensure-screen-management";
+import { selectBalancedFiller } from "@/lib/filler/selection";
 import type { PlayerItem, PlayerItemKind, PlayerManifest, PlayerTheme } from "./types";
-import { NEUSECAST_PLAN } from "@/lib/pricing";
+import { NEUSECAST_HOUSE_AD } from "./house-ad";
 
 const THEMES = new Set<PlayerTheme>(["aqua", "navy", "coral", "gold", "blue", "green"]);
 const KINDS = new Set<PlayerItemKind>(["advertisement", "host", "weather", "event", "history", "trivia", "community"]);
@@ -30,6 +32,9 @@ function resolveTheme(metadata: Record<string, unknown> | null, fallback: Player
 }
 
 function resolveKind(category: string): PlayerItemKind {
+  if (category === "did_you_know" || category === "fact") return "trivia";
+  if (category === "on_this_day") return "history";
+  if (category === "news") return "community";
   return KINDS.has(category as PlayerItemKind) ? (category as PlayerItemKind) : "community";
 }
 
@@ -37,23 +42,58 @@ function activeWindow(startsAt: AnyPgColumn, endsAt: AnyPgColumn, now: Date) {
   return and(or(isNull(startsAt), lte(startsAt, now)), or(isNull(endsAt), gte(endsAt, now)));
 }
 
-function interleaveRotation(advertisements: PlayerItem[], hostItems: PlayerItem[], fillerItems: PlayerItem[]) {
-  const rotation: PlayerItem[] = [];
-  const support = [...hostItems, ...fillerItems];
-  const max = Math.max(advertisements.length, support.length);
+function boundedDuration(value: unknown, fallback = 12) {
+  const duration = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(duration) ? Math.max(3, Math.min(Math.round(duration), 3_600)) : fallback;
+}
 
+function interleaveSupport(hostItems: PlayerItem[], fillerItems: PlayerItem[]) {
+  const support: PlayerItem[] = [];
+  const max = Math.max(hostItems.length, fillerItems.length);
   for (let index = 0; index < max; index += 1) {
-    const advertisement = advertisements[index % Math.max(advertisements.length, 1)];
-    const supportingItem = support[index % Math.max(support.length, 1)];
+    if (hostItems[index]) support.push(hostItems[index]);
+    if (fillerItems[index]) support.push(fillerItems[index]);
+  }
+  return support;
+}
 
-    if (advertisements.length > 0 && !rotation.some((item) => item.id === advertisement.id)) rotation.push(advertisement);
-    if (support.length > 0 && !rotation.some((item) => item.id === supportingItem.id)) rotation.push(supportingItem);
+function interleaveRotation(advertisements: PlayerItem[], hostItems: PlayerItem[], fillerItems: PlayerItem[]) {
+  const support = interleaveSupport(hostItems, fillerItems);
+  const paidSlots = advertisements.length
+    ? Math.max(advertisements.length, Math.ceil(support.length / 3))
+    : 0;
+  const baseLength = paidSlots + support.length;
+  const base: PlayerItem[] = [];
+  let paidIndex = 0;
+  let supportIndex = 0;
+
+  for (let position = 0; position < baseLength; position += 1) {
+    const expectedPaid = Math.floor(((position + 1) * paidSlots) / Math.max(baseLength, 1));
+    if (paidIndex < expectedPaid && advertisements.length) {
+      base.push(advertisements[paidIndex % advertisements.length]);
+      paidIndex += 1;
+    } else if (support[supportIndex]) {
+      base.push(support[supportIndex]);
+      supportIndex += 1;
+    } else if (advertisements.length) {
+      base.push(advertisements[paidIndex % advertisements.length]);
+      paidIndex += 1;
+    }
   }
 
+  const rotation: PlayerItem[] = [];
+  for (const item of base) {
+    rotation.push(item);
+    if (rotation.length % 7 === 6) rotation.push(NEUSECAST_HOUSE_AD);
+  }
+  if (!rotation.some((item) => item.id === NEUSECAST_HOUSE_AD.id)) rotation.push(NEUSECAST_HOUSE_AD);
   return rotation;
 }
 
-export async function getPlayerManifest(playerKey: string): Promise<PlayerManifest | null> {
+export async function getPlayerManifest(
+  playerKey: string,
+  options: { includeInactive?: boolean } = {},
+): Promise<PlayerManifest | null> {
   await ensureScreenManagementSchema();
   const database = getDatabase();
   const now = new Date();
@@ -68,10 +108,15 @@ export async function getPlayerManifest(playerKey: string): Promise<PlayerManife
       city: venues.city,
       state: venues.state,
       market: venues.market,
+      timeZone: venues.timeZone,
     })
     .from(screens)
     .innerJoin(venues, eq(screens.venueId, venues.id))
-    .where(and(eq(screens.provider, "neusecast"), eq(screens.providerScreenId, playerKey), eq(screens.active, true)))
+    .where(and(
+      eq(screens.provider, "neusecast"),
+      eq(screens.providerScreenId, playerKey),
+      options.includeInactive ? undefined : eq(screens.active, true),
+    ))
     .limit(1);
 
   if (!screen) return null;
@@ -92,15 +137,18 @@ export async function getPlayerManifest(playerKey: string): Promise<PlayerManife
       })
       .from(creatives)
       .innerJoin(campaigns, eq(creatives.campaignId, campaigns.id))
-      .leftJoin(campaignScreens, eq(campaignScreens.campaignId, campaigns.id))
+      .innerJoin(advertiserAccounts, eq(campaigns.advertiserAccountId, advertiserAccounts.id))
       .where(
         and(
-          or(eq(campaignScreens.screenId, screen.id), eq(campaigns.totalCents, NEUSECAST_PLAN.amountCents)),
+          eq(advertiserAccounts.active, true),
+          eq(advertiserAccounts.subscriptionStatus, "active"),
+          eq(campaigns.billingPaused, false),
           eq(creatives.status, "approved"),
           inArray(campaigns.status, ["approved", "scheduled", "active"]),
           activeWindow(campaigns.startsAt, campaigns.endsAt, now),
         ),
-      ),
+      )
+      .orderBy(creatives.id),
     database
       .select({
         id: hostContent.id,
@@ -120,7 +168,8 @@ export async function getPlayerManifest(playerKey: string): Promise<PlayerManife
           inArray(hostContent.status, ["approved", "scheduled"]),
           activeWindow(hostContent.startsAt, hostContent.endsAt, now),
         ),
-      ),
+      )
+      .orderBy(hostContent.id),
     database
       .select({
         id: generatedContent.id,
@@ -138,7 +187,9 @@ export async function getPlayerManifest(playerKey: string): Promise<PlayerManife
           or(isNull(generatedContent.market), eq(generatedContent.market, screen.market)),
           activeWindow(generatedContent.startsAt, generatedContent.expiresAt, now),
         ),
-      ),
+      )
+      .orderBy(desc(generatedContent.updatedAt))
+      .limit(200),
     database
       .select({ advertiserAccountId: screenAdvertiserBlocks.advertiserAccountId })
       .from(screenAdvertiserBlocks)
@@ -152,7 +203,7 @@ export async function getPlayerManifest(playerKey: string): Promise<PlayerManife
     source: "creative",
     campaignId: row.campaignId,
     creativeId: row.id,
-    durationSeconds: row.durationSeconds,
+    durationSeconds: boundedDuration(row.durationSeconds, 15),
     eyebrow: metadataString(row.metadata, "eyebrow") ?? "Local business",
     title: row.headline ?? row.name,
     body: row.body ?? "Proudly serving Eastern Carolina.",
@@ -178,13 +229,13 @@ export async function getPlayerManifest(playerKey: string): Promise<PlayerManife
     sponsor: screen.venueName,
   }));
 
-  const fillerItems: PlayerItem[] = generatedRows.map((row) => ({
+  const fillerItems: PlayerItem[] = selectBalancedFiller(generatedRows).map((row) => ({
     id: row.id,
     kind: resolveKind(row.category),
     source: "generated_content",
     campaignId: null,
     creativeId: null,
-    durationSeconds: Number(row.metadata?.durationSeconds) || 12,
+    durationSeconds: boundedDuration(row.metadata?.durationSeconds),
     eyebrow: metadataString(row.metadata, "eyebrow") ?? row.category,
     title: row.title,
     body: row.body,
@@ -194,8 +245,20 @@ export async function getPlayerManifest(playerKey: string): Promise<PlayerManife
     sponsor: row.sourceName,
   }));
 
+  const items = interleaveRotation(advertisements, hostItems, fillerItems);
+  const version = createHash("sha256")
+    .update(JSON.stringify({
+      screen: { id: screen.id, orientation: screen.orientation },
+      venue: { id: screen.venueId, timeZone: screen.timeZone },
+      items,
+    }))
+    .digest("hex")
+    .slice(0, 24);
+
   return {
     generatedAt: now.toISOString(),
+    serverTime: now.toISOString(),
+    version,
     refreshAfterSeconds: 180,
     screen: { id: screen.id, name: screen.name, orientation: screen.orientation },
     venue: {
@@ -203,7 +266,8 @@ export async function getPlayerManifest(playerKey: string): Promise<PlayerManife
       city: screen.city,
       state: screen.state,
       market: screen.market,
+      timeZone: screen.timeZone,
     },
-    items: interleaveRotation(advertisements, hostItems, fillerItems),
+    items,
   };
 }

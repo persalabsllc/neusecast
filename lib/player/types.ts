@@ -20,6 +20,8 @@ export type PlayerItem = {
 
 export type PlayerManifest = {
   generatedAt: string;
+  serverTime: string;
+  version: string;
   refreshAfterSeconds: number;
   screen: {
     id: string;
@@ -31,6 +33,7 @@ export type PlayerManifest = {
     city: string;
     state: string;
     market: string;
+    timeZone: string;
   };
   items: PlayerItem[];
 };
