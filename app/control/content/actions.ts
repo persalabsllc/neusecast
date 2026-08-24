@@ -91,6 +91,59 @@ export async function createFillerContent(formData: FormData) {
   redirect("/control/content?created=1");
 }
 
+export async function updateFillerContent(formData: FormData) {
+  await requireControlUser();
+  const contentId = value(formData, "contentId", 36);
+  const category = value(formData, "category", 40) as FillerCategory;
+  const theme = value(formData, "theme", 20) as FillerTheme;
+  const title = value(formData, "title", 180);
+  const body = value(formData, "body", 1_000);
+  if (
+    !contentId
+    || !FILLER_CATEGORIES.includes(category)
+    || !FILLER_THEMES.includes(theme)
+    || !title
+    || !body
+  ) return;
+
+  const database = getDatabase();
+  const [existing] = await database
+    .select({ metadata: generatedContent.metadata })
+    .from(generatedContent)
+    .where(eq(generatedContent.id, contentId))
+    .limit(1);
+  if (!existing) return;
+
+  const durationRaw = Number(value(formData, "durationSeconds", 4));
+  const durationSeconds = Number.isFinite(durationRaw) ? Math.max(8, Math.min(30, Math.round(durationRaw))) : 12;
+  const now = new Date();
+  const market = value(formData, "market", 100);
+  await database
+    .update(generatedContent)
+    .set({
+      category,
+      market: market || null,
+      title,
+      body,
+      sourceName: value(formData, "sourceName", 160) || null,
+      sourceUrl: optionalHttpUrl(formData, "sourceUrl"),
+      artworkUrl: optionalHttpUrl(formData, "artworkUrl"),
+      metadata: {
+        ...(existing.metadata ?? {}),
+        eyebrow: value(formData, "eyebrow", 80) || null,
+        callToAction: value(formData, "callToAction", 120) || null,
+        theme,
+        durationSeconds,
+        editedAt: now.toISOString(),
+        editedBy: "control_room",
+      },
+      updatedAt: now,
+    })
+    .where(eq(generatedContent.id, contentId));
+  revalidatePath("/control/content");
+  revalidatePath("/control/screens");
+}
+
 export async function setFillerActive(formData: FormData) {
   await requireControlUser();
   const contentId = value(formData, "contentId", 36);

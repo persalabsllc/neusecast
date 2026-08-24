@@ -320,16 +320,62 @@ async function saveMarketBatch(market: string, items: GeneratedFillerItem[]) {
     })
     .from(generatedContent)
     .where(eq(generatedContent.market, market));
-  const existingFingerprints = new Set(existing.map((row) => {
+  const existingByFingerprint = new Map(existing.map((row) => {
     const value = row.metadata?.fingerprint;
-    return typeof value === "string" ? value : "";
-  }).filter(Boolean));
+    return [typeof value === "string" ? value : "", row] as const;
+  }).filter(([fingerprint]) => Boolean(fingerprint)));
   let created = 0;
   let skipped = 0;
 
   for (const item of items) {
     const itemFingerprint = fingerprint(market, item);
-    if (existingFingerprints.has(itemFingerprint)) {
+    const matching = existingByFingerprint.get(itemFingerprint);
+    if (matching) {
+      const previousAutomaticIds = existing
+        .filter((row) => (
+          row.id !== matching.id
+          && row.approved
+          && row.category === item.category
+          && row.metadata?.origin === "automatic"
+        ))
+        .map((row) => row.id);
+      const refresh = database
+        .update(generatedContent)
+        .set({
+          category: item.category,
+          title: item.title,
+          body: item.body,
+          sourceName: item.sourceName,
+          sourceUrl: item.sourceUrl,
+          startsAt: now,
+          expiresAt: expiryFor(item, now),
+          approved: true,
+          metadata: {
+            ...(matching.metadata ?? {}),
+            origin: "automatic",
+            provider: "openai_web_search",
+            fingerprint: itemFingerprint,
+            eyebrow: item.eyebrow,
+            callToAction: item.callToAction,
+            theme: item.theme,
+            durationSeconds: item.durationSeconds,
+            generatedAt: now.toISOString(),
+            validUntil: item.validUntil,
+          },
+          updatedAt: now,
+        })
+        .where(eq(generatedContent.id, matching.id));
+      if (previousAutomaticIds.length) {
+        await database.batch([
+          refresh,
+          database
+            .update(generatedContent)
+            .set({ approved: false, expiresAt: now, updatedAt: now })
+            .where(inArray(generatedContent.id, previousAutomaticIds)),
+        ]);
+      } else {
+        await refresh;
+      }
       skipped += 1;
       continue;
     }
@@ -369,7 +415,13 @@ async function saveMarketBatch(market: string, items: GeneratedFillerItem[]) {
     } else {
       await insert;
     }
-    existingFingerprints.add(itemFingerprint);
+    existingByFingerprint.set(itemFingerprint, {
+      id: "",
+      category: item.category,
+      approved: true,
+      expiresAt: expiryFor(item, now),
+      metadata: { origin: "automatic", fingerprint: itemFingerprint },
+    });
     created += 1;
   }
 

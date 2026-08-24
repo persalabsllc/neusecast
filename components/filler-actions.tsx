@@ -1,7 +1,7 @@
 "use client";
 
 import { useFormStatus } from "react-dom";
-import { Pause, Play, Plus, Sparkles, Trash2 } from "lucide-react";
+import { Pause, Play, Plus, Save, Sparkles, Trash2 } from "lucide-react";
 
 export function CreateFillerButton() {
   const { pending } = useFormStatus();
@@ -11,6 +11,11 @@ export function CreateFillerButton() {
 export function GenerateFillerButton() {
   const { pending } = useFormStatus();
   return <button className="button button-primary" type="submit" disabled={pending}><Sparkles size={16} className={pending ? "is-spinning" : undefined} />{pending ? "Researching live sources…" : "Generate fresh batch"}</button>;
+}
+
+export function UpdateFillerButton() {
+  const { pending } = useFormStatus();
+  return <button className="button button-primary" type="submit" disabled={pending}><Save size={16} />{pending ? "Saving…" : "Save changes"}</button>;
 }
 
 export function FillerStatusButton({ active }: { active: boolean }) {

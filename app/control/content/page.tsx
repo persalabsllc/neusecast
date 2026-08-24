@@ -20,6 +20,7 @@ import {
   FillerStatusButton,
   GenerateFillerButton,
 } from "@/components/filler-actions";
+import { FillerEditDialog } from "@/components/filler-edit-dialog";
 import { ScreenFleetRefresh } from "@/components/screen-fleet-refresh";
 import { ensureScreenManagementSchema } from "@/lib/db/ensure-screen-management";
 import { getDatabase } from "@/lib/db";
@@ -46,6 +47,7 @@ import {
   deleteFillerContent,
   generateFillerNow,
   setFillerActive,
+  updateFillerContent,
 } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -302,6 +304,26 @@ export default async function ContentPage({ searchParams }: {
                   </div>
                 </div>
                 <div className="filler-row-actions">
+                  <FillerEditDialog
+                    key={item.updatedAt.toISOString()}
+                    action={updateFillerContent}
+                    markets={markets}
+                    filler={{
+                      id: item.id,
+                      category: item.category as FillerCategory,
+                      market: item.market,
+                      title: item.title,
+                      body: item.body,
+                      eyebrow: metadataText(item.metadata, "eyebrow") ?? "",
+                      callToAction: metadataText(item.metadata, "callToAction") ?? "",
+                      sourceName: item.sourceName ?? "",
+                      sourceUrl: item.sourceUrl ?? "",
+                      artworkUrl: item.artworkUrl ?? "",
+                      theme: (metadataText(item.metadata, "theme") ?? "navy") as (typeof FILLER_THEMES)[number],
+                      durationSeconds: metadataNumber(item.metadata, "durationSeconds", 12),
+                      automatic: metadataText(item.metadata, "origin") === "automatic",
+                    }}
+                  />
                   <form action={setFillerActive}>
                     <input type="hidden" name="contentId" value={item.id} />
                     <input type="hidden" name="approved" value={active ? "false" : "true"} />
