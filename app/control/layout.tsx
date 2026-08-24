@@ -16,7 +16,7 @@ export default async function ControlLayout({ children }: Readonly<{ children: R
   const email = verifiedPrimaryEmail(user);
 
   if (!user) redirect("/sign-in");
-  if (!email || !controlRoomEmails.has(email)) redirect("/host");
+  if (!email || !controlRoomEmails.has(email)) redirect("/access-required?workspace=control");
 
   return <AppShell>{children}</AppShell>;
 }

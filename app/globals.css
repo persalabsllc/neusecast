@@ -264,6 +264,17 @@ textarea:focus-visible {
   line-height: 1.6;
 }
 
+.auth-intro p + p {
+  margin-top: 14px;
+}
+
+.auth-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
+}
+
 @media (max-width: 760px) {
   .auth-brand-row {
     margin-bottom: 44px;
