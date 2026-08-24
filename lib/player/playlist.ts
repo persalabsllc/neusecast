@@ -1,13 +1,15 @@
 import { createHash } from "node:crypto";
-import { and, desc, eq, inArray, isNull, lte, or, gte } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, isNull, lte, max, or } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { getDatabase } from "@/lib/db";
 import {
   campaigns,
+  campaignScreens,
   advertiserAccounts,
   creatives,
   generatedContent,
   hostContent,
+  playbackEvents,
   screenAdvertiserBlocks,
   screens,
   venues,
@@ -16,6 +18,7 @@ import { ensureScreenManagementSchema } from "@/lib/db/ensure-screen-management"
 import { selectBalancedFiller } from "@/lib/filler/selection";
 import type { PlayerItem, PlayerItemKind, PlayerManifest, PlayerTheme } from "./types";
 import { NEUSECAST_HOUSE_AD } from "./house-ad";
+import { broadcastDayWindow } from "@/lib/time-zone";
 
 const THEMES = new Set<PlayerTheme>(["aqua", "navy", "coral", "gold", "blue", "green"]);
 const KINDS = new Set<PlayerItemKind>(["advertisement", "host", "weather", "event", "history", "trivia", "community"]);
@@ -59,34 +62,40 @@ function interleaveSupport(hostItems: PlayerItem[], fillerItems: PlayerItem[]) {
 
 function interleaveRotation(advertisements: PlayerItem[], hostItems: PlayerItem[], fillerItems: PlayerItem[]) {
   const support = interleaveSupport(hostItems, fillerItems);
-  const paidSlots = advertisements.length
-    ? Math.max(advertisements.length, Math.ceil(support.length / 3))
-    : 0;
-  const baseLength = paidSlots + support.length;
+  const advertisementQueue = advertisements.slice(0, Math.max(1, Math.ceil(support.length / 3)));
   const base: PlayerItem[] = [];
-  let paidIndex = 0;
   let supportIndex = 0;
+  let advertisementIndex = 0;
 
-  for (let position = 0; position < baseLength; position += 1) {
-    const expectedPaid = Math.floor(((position + 1) * paidSlots) / Math.max(baseLength, 1));
-    if (paidIndex < expectedPaid && advertisements.length) {
-      base.push(advertisements[paidIndex % advertisements.length]);
-      paidIndex += 1;
-    } else if (support[supportIndex]) {
+  while (supportIndex < support.length || advertisementIndex < advertisementQueue.length) {
+    const supportTarget = advertisementIndex < advertisementQueue.length ? 3 : support.length;
+    for (let index = 0; index < supportTarget && supportIndex < support.length; index += 1) {
       base.push(support[supportIndex]);
       supportIndex += 1;
-    } else if (advertisements.length) {
-      base.push(advertisements[paidIndex % advertisements.length]);
-      paidIndex += 1;
+    }
+
+    if (advertisementIndex < advertisementQueue.length) {
+      if (base.at(-1)?.kind === "advertisement") base.push(NEUSECAST_HOUSE_AD);
+      base.push(advertisementQueue[advertisementIndex]);
+      advertisementIndex += 1;
     }
   }
 
   const rotation: PlayerItem[] = [];
+  let contentSinceHouseAd = 0;
   for (const item of base) {
     rotation.push(item);
-    if (rotation.length % 7 === 6) rotation.push(NEUSECAST_HOUSE_AD);
+    if (item.id === NEUSECAST_HOUSE_AD.id) {
+      contentSinceHouseAd = 0;
+    } else {
+      contentSinceHouseAd += 1;
+      if (contentSinceHouseAd >= 6) {
+        rotation.push(NEUSECAST_HOUSE_AD);
+        contentSinceHouseAd = 0;
+      }
+    }
   }
-  if (!rotation.some((item) => item.id === NEUSECAST_HOUSE_AD.id)) rotation.push(NEUSECAST_HOUSE_AD);
+  if (rotation.at(-1)?.id !== NEUSECAST_HOUSE_AD.id) rotation.push(NEUSECAST_HOUSE_AD);
   return rotation;
 }
 
@@ -121,7 +130,9 @@ export async function getPlayerManifest(
 
   if (!screen) return null;
 
-  const [creativeRows, hostRows, generatedRows, blockedRows] = await Promise.all([
+  const broadcastDay = broadcastDayWindow(now, screen.timeZone);
+
+  const [creativeRows, hostRows, generatedRows, blockedRows, playbackRows] = await Promise.all([
     database
       .selectDistinct({
         id: creatives.id,
@@ -135,10 +146,15 @@ export async function getPlayerManifest(
         durationSeconds: creatives.durationSeconds,
         metadata: creatives.metadata,
         expiresAt: campaigns.endsAt,
+        scheduledPlaysPerDay: campaignScreens.scheduledPlaysPerDay,
       })
       .from(creatives)
       .innerJoin(campaigns, eq(creatives.campaignId, campaigns.id))
       .innerJoin(advertiserAccounts, eq(campaigns.advertiserAccountId, advertiserAccounts.id))
+      .innerJoin(campaignScreens, and(
+        eq(campaignScreens.campaignId, campaigns.id),
+        eq(campaignScreens.screenId, screen.id),
+      ))
       .where(
         and(
           eq(advertiserAccounts.active, true),
@@ -197,10 +213,43 @@ export async function getPlayerManifest(
       .select({ advertiserAccountId: screenAdvertiserBlocks.advertiserAccountId })
       .from(screenAdvertiserBlocks)
       .where(eq(screenAdvertiserBlocks.screenId, screen.id)),
+    database
+      .select({
+        campaignId: playbackEvents.campaignId,
+        plays: count(playbackEvents.id),
+        lastPlayedAt: max(playbackEvents.playedAt),
+      })
+      .from(playbackEvents)
+      .where(and(
+        eq(playbackEvents.screenId, screen.id),
+        gte(playbackEvents.playedAt, broadcastDay.start),
+        lte(playbackEvents.playedAt, now),
+      ))
+      .groupBy(playbackEvents.campaignId),
   ]);
 
   const blockedAdvertisers = new Set(blockedRows.map((row) => row.advertiserAccountId));
-  const advertisements: PlayerItem[] = creativeRows.filter((row) => !blockedAdvertisers.has(row.advertiserAccountId)).map((row) => ({
+  const playbackByCampaign = new Map(playbackRows.map((row) => [row.campaignId, row]));
+  const broadcastDayLengthMs = broadcastDay.end.getTime() - broadcastDay.start.getTime();
+  const dueCreativeRows = creativeRows.filter((row) => {
+    if (blockedAdvertisers.has(row.advertiserAccountId)) return false;
+    const target = Math.max(1, row.scheduledPlaysPerDay ?? 12);
+    const delivery = playbackByCampaign.get(row.campaignId);
+    const delivered = delivery?.plays ?? 0;
+    if (delivered >= target) return false;
+
+    const intervalMs = broadcastDayLengthMs / target;
+    const nextScheduledAt = broadcastDay.start.getTime() + (delivered * intervalMs);
+    const minimumRecoveryGapMs = Math.max(15 * 60_000, intervalMs / 2);
+    const lastPlayedAt = delivery?.lastPlayedAt?.getTime() ?? 0;
+    return now.getTime() >= nextScheduledAt
+      && (!lastPlayedAt || now.getTime() - lastPlayedAt >= minimumRecoveryGapMs);
+  }).sort((left, right) => {
+    const leftDelivery = playbackByCampaign.get(left.campaignId);
+    const rightDelivery = playbackByCampaign.get(right.campaignId);
+    return (leftDelivery?.lastPlayedAt?.getTime() ?? 0) - (rightDelivery?.lastPlayedAt?.getTime() ?? 0);
+  });
+  const advertisements: PlayerItem[] = dueCreativeRows.map((row) => ({
     id: row.id,
     kind: "advertisement",
     source: "creative",

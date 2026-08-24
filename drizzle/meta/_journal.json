@@ -43,6 +43,13 @@
       "when": 1787601972302,
       "tag": "0005_launch_invariants",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787606711120,
+      "tag": "0006_perfect_kate_bishop",
+      "breakpoints": true
     }
   ]
 }

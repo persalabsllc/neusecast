@@ -107,3 +107,31 @@ export function nextBroadcastMorning(
   if (!result) throw new Error(`Unable to calculate the next broadcast morning for ${timeZone}.`);
   return result;
 }
+
+export function broadcastDayWindow(
+  now = new Date(),
+  timeZone = "America/New_York",
+) {
+  const localNow = localParts(now, timeZone);
+  const localDate = new Date(Date.UTC(localNow.year, localNow.month - 1, localNow.day));
+  if (localNow.hour < 6) localDate.setUTCDate(localDate.getUTCDate() - 1);
+
+  const start = dateTimeInZone({
+    year: localDate.getUTCFullYear(),
+    month: localDate.getUTCMonth() + 1,
+    day: localDate.getUTCDate(),
+    hour: 6,
+    minute: 0,
+  }, timeZone);
+  localDate.setUTCDate(localDate.getUTCDate() + 1);
+  const end = dateTimeInZone({
+    year: localDate.getUTCFullYear(),
+    month: localDate.getUTCMonth() + 1,
+    day: localDate.getUTCDate(),
+    hour: 6,
+    minute: 0,
+  }, timeZone);
+
+  if (!start || !end) throw new Error(`Unable to calculate the broadcast day for ${timeZone}.`);
+  return { start, end };
+}

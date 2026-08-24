@@ -28,7 +28,7 @@ const advertiserBenefits = [
   {
     icon: Target,
     title: "Cover the whole network",
-    copy: "One transparent plan places your campaign on every active NeuseCast screen.",
+    copy: "One transparent plan places your campaign on every active screen, paced for 12 verified plays per screen each day.",
   },
   {
     icon: Palette,
@@ -95,7 +95,7 @@ export default function Home() {
           </p>
           <div className="button-row">
             <Link className="button button-primary" href="/advertiser/new">
-              Build your campaign · $75/mo <ArrowRight size={17} aria-hidden="true" />
+            Preview your ad · $75/mo <ArrowRight size={17} aria-hidden="true" />
             </Link>
             <a className="button button-secondary" href="#how-it-works">
               See how it works
@@ -140,8 +140,8 @@ export default function Home() {
           <span>Designed for Eastern Carolina businesses and customers.</span>
         </article>
         <article>
-          <strong>Visible</strong>
-          <span>Full-screen creative in real neighborhood locations.</span>
+          <strong>12 plays daily</strong>
+          <span>Per active screen, paced through the broadcast day.</span>
         </article>
         <article>
           <strong>Flexible</strong>
@@ -184,14 +184,14 @@ export default function Home() {
       <section className="sales-pricing sales-container" id="pricing">
         <div className="sales-pricing-copy">
           <div className="eyebrow">Transparent founding rate</div>
-          <h2>Every screen. Creative included. $75 a month.</h2>
+          <h2>Every screen. 12 daily plays. $75 a month.</h2>
           <p>No quote request, confusing package, or surprise screen fee. Build and preview your campaign online, then subscribe securely while your message is fresh.</p>
-          <ul><li><Check size={16} aria-hidden="true" /> Placement on every active NeuseCast screen</li><li><Check size={16} aria-hidden="true" /> Screen-ready creative and revisions</li><li><Check size={16} aria-hidden="true" /> Verified proof-of-play reporting</li><li><Check size={16} aria-hidden="true" /> Cancel anytime</li></ul>
+          <ul><li><Check size={16} aria-hidden="true" /> 12 verified plays per active screen, per day</li><li><Check size={16} aria-hidden="true" /> Screen-ready creative and revisions</li><li><Check size={16} aria-hidden="true" /> Proof-of-play reporting</li><li><Check size={16} aria-hidden="true" /> Month-to-month; cancel anytime</li></ul>
         </div>
         <div className="sales-price-card">
           <span>ALL-SCREEN PLAN</span>
           <strong><small>$</small>75<em>/month</em></strong>
-          <p>Paid campaigns enter the following day’s broadcast queue, subject to a fast content review.</p>
+          <p>Paid campaigns enter the following day’s paced broadcast schedule, subject to a fast content review.</p>
           <Link className="button button-primary" href="/advertiser/new">Create your campaign <ArrowRight size={17} aria-hidden="true" /></Link>
           <small>Secure recurring billing powered by Stripe.</small>
         </div>
@@ -303,7 +303,7 @@ export default function Home() {
           </details>
           <details>
             <summary>Where will my campaign appear?<ChevronRight size={17} aria-hidden="true" /></summary>
-            <p>The founding $75/month plan includes every active screen in the NeuseCast network.</p>
+            <p>The founding $75/month plan includes 12 verified plays per day on every active, compatible screen in the NeuseCast network.</p>
           </details>
         </div>
       </section>
@@ -320,6 +320,9 @@ export default function Home() {
             <Link href="/advertiser">Advertiser login</Link>
             <Link href="/host">Host login</Link>
             <Link href="/control">Control Room login</Link>
+            <Link href="/terms">Terms</Link>
+            <Link href="/advertising-terms">Advertising terms</Link>
+            <Link href="/privacy">Privacy</Link>
           </div>
           <div className="sales-footer-company">
             <Building2 size={16} aria-hidden="true" /> A Persa Labs company

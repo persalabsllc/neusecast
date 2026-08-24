@@ -277,6 +277,8 @@ export const campaignOrders = pgTable(
     amountCents: integer("amount_cents").notNull(),
     currency: varchar("currency", { length: 3 }).default("USD").notNull(),
     paidAt: timestamp("paid_at", { withTimezone: true }),
+    termsAcceptedAt: timestamp("terms_accepted_at", { withTimezone: true }),
+    termsVersion: varchar("terms_version", { length: 40 }),
     ...timestamps,
   },
   (table) => [

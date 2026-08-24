@@ -11,6 +11,7 @@ import { advertiserAccounts, appUsers, campaignOrders, campaignScreens, campaign
 import { NEUSECAST_PLAN } from "@/lib/pricing";
 import { getApplicationUrl, getStripe } from "@/lib/stripe";
 import { nextBroadcastMorning } from "@/lib/time-zone";
+import { ADVERTISING_TERMS_VERSION } from "@/lib/legal";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
@@ -130,6 +131,12 @@ export async function createCampaignAndCheckout(formData: FormData) {
     redirect("/advertiser/new?error=campaign-details");
   }
 
+  const hasActiveSubscription = hasActiveAdvertiserSubscription(account.subscriptionStatus);
+  const acceptedTerms = formData.get("acceptTerms") === "on";
+  if (!hasActiveSubscription && !acceptedTerms) {
+    redirect("/advertiser/new?error=terms-required");
+  }
+
   if (requiresAdvertiserBillingAction(account.subscriptionStatus)) {
     await redirectToBillingPortal(account.stripeCustomerId);
   }
@@ -164,6 +171,12 @@ export async function createCampaignAndCheckout(formData: FormData) {
       .orderBy(desc(creatives.createdAt))
       .limit(1);
 
+    const orderUpdate = database.update(campaignOrders).set({
+      termsAcceptedAt: new Date(),
+      termsVersion: ADVERTISING_TERMS_VERSION,
+      updatedAt: new Date(),
+    }).where(eq(campaignOrders.id, pendingOrder.id));
+
     if (draftCreative) {
       const creativeUpdate = database.update(creatives).set({
         name,
@@ -173,7 +186,7 @@ export async function createCampaignAndCheckout(formData: FormData) {
         metadata: { eyebrow, theme, sponsor: account.businessName },
         updatedAt: new Date(),
       }).where(eq(creatives.id, draftCreative.id));
-      await database.batch([campaignUpdate, creativeUpdate] as const);
+      await database.batch([campaignUpdate, creativeUpdate, orderUpdate] as const);
     } else {
       const creativeInsert = database.insert(creatives).values({
         campaignId: pendingOrder.campaignId,
@@ -186,13 +199,12 @@ export async function createCampaignAndCheckout(formData: FormData) {
         callToAction,
         metadata: { eyebrow, theme, sponsor: account.businessName },
       });
-      await database.batch([campaignUpdate, creativeInsert] as const);
+      await database.batch([campaignUpdate, creativeInsert, orderUpdate] as const);
     }
 
     redirect(await createCampaignCheckout(pendingOrder.id, user.id));
   }
 
-  const hasActiveSubscription = hasActiveAdvertiserSubscription(account.subscriptionStatus);
   const orderId = randomUUID();
   const campaignInsert = database.insert(campaigns).values({
     id: submissionId,
@@ -225,6 +237,8 @@ export async function createCampaignAndCheckout(formData: FormData) {
     advertiserAccountId: account.id,
     amountCents: NEUSECAST_PLAN.amountCents,
     currency: NEUSECAST_PLAN.currency,
+    termsAcceptedAt: new Date(),
+    termsVersion: ADVERTISING_TERMS_VERSION,
   });
 
   let uniqueConflict: unknown = null;
@@ -261,7 +275,14 @@ export async function createCampaignAndCheckout(formData: FormData) {
         ))
         .orderBy(desc(campaignOrders.createdAt))
         .limit(1);
-      if (recoveredOrder) redirect(await createCampaignCheckout(recoveredOrder.id, user.id));
+      if (recoveredOrder) {
+        await database.update(campaignOrders).set({
+          termsAcceptedAt: new Date(),
+          termsVersion: ADVERTISING_TERMS_VERSION,
+          updatedAt: new Date(),
+        }).where(eq(campaignOrders.id, recoveredOrder.id));
+        redirect(await createCampaignCheckout(recoveredOrder.id, user.id));
+      }
     }
 
     throw uniqueConflict;

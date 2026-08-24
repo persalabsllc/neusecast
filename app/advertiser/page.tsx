@@ -51,11 +51,11 @@ export default async function AdvertiserPage({ searchParams }: AdvertiserPagePro
       <main className="advertiser-onboarding">
         <section className="advertiser-onboarding-copy">
           <div className="eyebrow">Advertiser workspace</div>
-          <h1>Let’s set up your business profile.</h1>
-          <p>We’ll use these details for campaign review, receipts, and billing. Creating your profile is free; campaigns are a transparent $75 per month.</p>
+          <h1>Put your business on local screens.</h1>
+          <p>Create your free profile, build and preview your ad, then launch across the network for one transparent $75 monthly price.</p>
           <ul>
             <li><BadgeCheck size={17} aria-hidden="true" /> Build and preview your own creative</li>
-            <li><BadgeCheck size={17} aria-hidden="true" /> Run on every active NeuseCast screen</li>
+            <li><BadgeCheck size={17} aria-hidden="true" /> 12 verified plays per screen, per day</li>
             <li><BadgeCheck size={17} aria-hidden="true" /> Launch for {NEUSECAST_MONTHLY_PRICE}/month after secure checkout</li>
           </ul>
         </section>

@@ -35,9 +35,9 @@ export default async function NewCampaignPage({ searchParams }: NewCampaignPageP
       <Link className="back-link" href="/advertiser"><ArrowLeft size={16} aria-hidden="true" /> Advertiser dashboard</Link>
       <header className="campaign-studio-header">
         <div><div className="eyebrow">One simple plan</div><h1>Build it. Preview it. Put it everywhere.</h1><p>Create your message now, see exactly how it will look, and continue directly to secure checkout while your campaign is ready to go.</p></div>
-        <aside className="campaign-plan-card"><span>{hasActiveSubscription ? "Plan active" : "$75"} <small>{hasActiveSubscription ? "· no additional charge" : "/ month"}</small></span><ul><li><Check size={15} aria-hidden="true" /> Every active NeuseCast screen</li><li><MonitorPlay size={15} aria-hidden="true" /> Screen-ready creative included</li><li><ShieldCheck size={15} aria-hidden="true" /> Next-day queue with human review</li></ul></aside>
+        <aside className="campaign-plan-card"><span>{hasActiveSubscription ? "Plan active" : "$75"} <small>{hasActiveSubscription ? "· no additional charge" : "/ month"}</small></span><ul><li><Check size={15} aria-hidden="true" /> Every active NeuseCast screen</li><li><MonitorPlay size={15} aria-hidden="true" /> 12 verified plays per screen, per day</li><li><ShieldCheck size={15} aria-hidden="true" /> Screen-ready creative and review included</li></ul></aside>
       </header>
-      {params.error ? <p className="form-error campaign-studio-error">Please complete every creative field before continuing.</p> : null}
+      {params.error ? <p className="form-error campaign-studio-error">{params.error === "terms-required" ? "Please accept the service and advertising terms before checkout." : "Please complete every creative field before continuing."}</p> : null}
       <CampaignBuilder action={createCampaignAndCheckout} mode={hasActiveSubscription ? "included" : "checkout"} submissionId={submissionId} />
     </main>
   );

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useFormStatus } from "react-dom";
 import { ArrowRight, BadgeCheck, CreditCard, Eye, Sparkles } from "lucide-react";
+import Link from "next/link";
 
 type CampaignBuilderProps = {
   action: (formData: FormData) => void | Promise<void>;
@@ -56,8 +57,14 @@ export function CampaignBuilder({ action, campaignId, submissionId, mode = "chec
         <label className="field"><span className="field-label">Call to action</span><input name="callToAction" required maxLength={120} value={callToAction} placeholder="What should customers do next?" onChange={(event) => setCallToAction(event.target.value)} /></label>
         <label className="field"><span className="field-label">Visual style</span><select name="theme" value={theme} onChange={(event) => setTheme(event.target.value)}>{themes.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
         <div className="creative-builder-assurance"><BadgeCheck size={18} aria-hidden="true" /><p><strong>Creative help is included.</strong> Your draft enters review after checkout. We can polish it or contact you before it airs.</p></div>
+        {mode === "checkout" ? (
+          <label className="checkout-consent">
+            <input name="acceptTerms" type="checkbox" required />
+            <span>I agree to the <Link href="/terms" target="_blank">Terms of Service</Link>, <Link href="/advertising-terms" target="_blank">Advertising Terms</Link>, and acknowledge the <Link href="/privacy" target="_blank">Privacy Policy</Link>.</span>
+          </label>
+        ) : null}
         <CampaignSubmitButton mode={mode} />
-        {mode === "checkout" ? <p className="creative-billing-note">$75/month until canceled. Your campaign is scheduled for the next broadcast day after successful payment, subject to content review.</p> : mode === "included" ? <p className="creative-billing-note">Included with your active all-screen plan. No additional charge.</p> : null}
+        {mode === "checkout" ? <p className="creative-billing-note">$75/month until canceled. Approved campaigns are paced for 12 verified plays per active screen each broadcast day.</p> : mode === "included" ? <p className="creative-billing-note">Included with your active all-screen plan. No additional charge.</p> : null}
       </section>
       <aside className="creative-preview-panel">
         <div className="creative-preview-label"><span><Eye size={15} aria-hidden="true" /> Live screen preview</span><small>16:9 display</small></div>

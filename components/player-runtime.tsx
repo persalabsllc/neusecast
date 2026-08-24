@@ -304,6 +304,7 @@ export function PlayerRuntime({
   const [manifestExpired, setManifestExpired] = useState(
     () => initialManifestAgeMs > MAX_CACHED_MANIFEST_AGE_MS,
   );
+  const [playedAdvertisements, setPlayedAdvertisements] = useState<Set<string>>(() => new Set());
   const clockOffsetRef = useRef(clockOffset(initialManifest.serverTime));
   const manifestFreshnessRef = useRef<ManifestFreshnessAnchor>({
     ageMs: initialManifestAgeMs,
@@ -318,10 +319,11 @@ export function PlayerRuntime({
   const flushingPlayback = useRef(false);
   const refreshingManifest = useRef(false);
   const playableItems = useMemo(() => manifest.items.filter((item) => {
+    if (!preview && item.kind === "advertisement" && playedAdvertisements.has(item.id)) return false;
     if (!item.expiresAt) return true;
     const expiresAt = Date.parse(item.expiresAt);
     return Number.isFinite(expiresAt) && expiresAt > serverNowMs;
-  }), [manifest.items, serverNowMs]);
+  }), [manifest.items, playedAdvertisements, preview, serverNowMs]);
   const displayedIndex = activeIndex < playableItems.length ? activeIndex : 0;
   const currentItem = playableItems[displayedIndex] ?? null;
 
@@ -516,6 +518,10 @@ export function PlayerRuntime({
   }, [currentItem?.id, manifest.version]);
 
   useEffect(() => {
+    setPlayedAdvertisements(new Set());
+  }, [manifest.version]);
+
+  useEffect(() => {
     const checkFreshness = () => {
       const anchor = manifestFreshnessRef.current;
       const elapsedMs = Math.max(0, monotonicTime() - anchor.monotonicTimeMs);
@@ -668,6 +674,9 @@ export function PlayerRuntime({
 
     const advance = window.setTimeout(() => {
       if (!preview) {
+        if (currentItem.kind === "advertisement") {
+          setPlayedAdvertisements((current) => new Set(current).add(currentItem.id));
+        }
         void sendPlayback({
           eventId: crypto.randomUUID(),
           itemId: currentItem.id,
@@ -679,6 +688,8 @@ export function PlayerRuntime({
           sessionId: sessionId.current,
           playerVersion,
           playedAt: new Date(Date.now() + clockOffsetRef.current).toISOString(),
+        }).then(() => {
+          if (currentItem.kind === "advertisement") void refreshManifest();
         });
       }
       setActiveIndex((displayedIndex + 1) % playableItems.length);
@@ -687,7 +698,7 @@ export function PlayerRuntime({
     return () => {
       window.clearTimeout(advance);
     };
-  }, [accessRevoked, currentItem, displayedIndex, manifestExpired, playableItems.length, playerVersion, preview, sendPlayback]);
+  }, [accessRevoked, currentItem, displayedIndex, manifestExpired, playableItems.length, playerVersion, preview, refreshManifest, sendPlayback]);
 
   if (accessRevoked) {
     return (

@@ -9,7 +9,7 @@ import { redirect } from "next/navigation";
 import { getDatabase } from "@/lib/db";
 import { verifiedPrimaryEmail } from "@/lib/auth-email";
 import { ensureScreenManagementSchema } from "@/lib/db/ensure-screen-management";
-import { appUsers, screens, venues } from "@/lib/db/schema";
+import { appUsers, campaignScreens, campaigns, screens, venues } from "@/lib/db/schema";
 import { createPlayerPairingToken, pairingCookieName } from "@/lib/player/pairing";
 
 const controlRoomEmails = new Set((process.env.CONTROL_ROOM_EMAILS ?? "persalabsllc@gmail.com").split(",").map((email) => email.trim().toLowerCase()).filter(Boolean));
@@ -109,6 +109,19 @@ export async function activateScreen(formData: FormData) {
     ] as const);
   } else {
     await database.batch([venueInsert, screenInsert] as const);
+  }
+
+  const activeCampaigns = await database
+    .select({ id: campaigns.id })
+    .from(campaigns)
+    .where(inArray(campaigns.status, ["approved", "scheduled", "active"]));
+  if (activeCampaigns.length > 0) {
+    await database.insert(campaignScreens).values(activeCampaigns.map((campaign) => ({
+      campaignId: campaign.id,
+      screenId,
+      priceCents: 0,
+      scheduledPlaysPerDay: 12,
+    }))).onConflictDoNothing();
   }
 
   (await cookies()).set(pairingCookieName(screenId), pairing.token, {
