@@ -19,7 +19,7 @@ export default function SignInPage() {
         <div className="auth-intro">
           <div className="eyebrow">Secure workspace</div>
           <h1>Welcome back.</h1>
-          <p>Sign in to manage your host screen or enter the NeuseCast control room.</p>
+          <p>Sign in to manage an advertising campaign, update a host screen, or enter the NeuseCast control room.</p>
         </div>
         <SignIn
           path="/sign-in"
