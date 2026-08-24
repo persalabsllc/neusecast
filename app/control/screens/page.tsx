@@ -3,16 +3,17 @@ import { desc, eq } from "drizzle-orm";
 import { ExternalLink, MapPin, Monitor, Plus, Wifi, WifiOff } from "lucide-react";
 import { getDatabase } from "@/lib/db";
 import { ensureScreenManagementSchema } from "@/lib/db/ensure-screen-management";
-import { screens, venues } from "@/lib/db/schema";
+import { appUsers, screens, venues } from "@/lib/db/schema";
 import { activateScreen } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function ScreensPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   await ensureScreenManagementSchema();
-  const [{ error }, rows] = await Promise.all([
+  const [{ error }, rows, hosts] = await Promise.all([
     searchParams,
     getDatabase().select({ id: screens.id, name: screens.name, playerKey: screens.providerScreenId, status: screens.status, active: screens.active, lastSeenAt: screens.lastSeenAt, venueName: venues.name, city: venues.city, market: venues.market, hostClerkUserId: venues.hostClerkUserId }).from(screens).innerJoin(venues, eq(screens.venueId, venues.id)).orderBy(desc(screens.createdAt)),
+    getDatabase().select({ id: appUsers.clerkUserId, name: appUsers.displayName, email: appUsers.email, status: appUsers.status }).from(appUsers).where(eq(appUsers.role, "host")).orderBy(appUsers.displayName),
   ]);
   const online = rows.filter((row) => row.status === "online").length;
   const attention = rows.filter((row) => row.active && row.status !== "online").length;
@@ -30,10 +31,11 @@ export default async function ScreensPage({ searchParams }: { searchParams: Prom
     <details className="panel screen-activation-panel" open={rows.length === 0 || Boolean(error)}>
       <summary><Plus size={18} /> Activate a new screen</summary>
       <form action={activateScreen} className="screen-activation-form">
-        {error ? <p className="form-error field-wide">Complete every required field before activating the screen.</p> : null}
-        <div className="form-heading field-wide"><h2>Host and location</h2><p>The email reserves this location for the host. After signing up with the same address, that host sees only their assigned screens.</p></div>
-        <label className="field"><span className="field-label">Host name</span><input name="hostName" required /></label>
-        <label className="field"><span className="field-label">Host email</span><input name="hostEmail" type="email" required /></label>
+        {error ? <p className="form-error field-wide">Complete every required field and choose a valid host before activating the screen.</p> : null}
+        <div className="form-heading field-wide"><h2>Host and location</h2><p>Choose an existing host account, or enter a new host below. A new email reserves the venue until that host signs up.</p></div>
+        <label className="field field-wide"><span className="field-label">Existing host account (optional)</span><select name="existingHostId" defaultValue=""><option value="">Create or reserve a new host account</option>{hosts.map((host) => <option value={host.id} key={host.id}>{host.name || host.email} · {host.email}{host.status === "invited" ? " · invited" : ""}</option>)}</select></label>
+        <label className="field"><span className="field-label">New host name</span><input name="hostName" /></label>
+        <label className="field"><span className="field-label">New host email</span><input name="hostEmail" type="email" /></label>
         <label className="field"><span className="field-label">Business / venue</span><input name="venueName" required /></label>
         <label className="field"><span className="field-label">Venue type</span><input name="venueType" placeholder="Restaurant, gym, waiting room…" required /></label>
         <label className="field field-wide"><span className="field-label">Street address</span><input name="addressLine1" required /></label>
