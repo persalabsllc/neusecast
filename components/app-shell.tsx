@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -160,9 +161,7 @@ export function AppShell({ children }: AppShellProps) {
             <strong>Kyle</strong>
             <small>Persa Labs · Admin</small>
           </span>
-          <button className="icon-button" type="button" aria-label="Open account menu">
-            <ChevronDown size={16} aria-hidden="true" />
-          </button>
+          <UserButton />
         </div>
       </aside>
 
