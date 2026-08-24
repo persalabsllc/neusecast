@@ -1,7 +1,7 @@
 import type Stripe from "stripe";
 import { and, eq } from "drizzle-orm";
 import { getDatabase } from "@/lib/db";
-import { advertiserAccounts, campaignOrders, campaigns } from "@/lib/db/schema";
+import { advertiserAccounts, campaignOrders, campaignScreens, campaigns, creatives, screens } from "@/lib/db/schema";
 import { getStripe } from "@/lib/stripe";
 
 function idFromExpandable(value: string | { id: string } | null) {
@@ -18,11 +18,14 @@ async function fulfillCheckout(session: Stripe.Checkout.Session) {
   if (!orderId || !campaignId || !advertiserAccountId) return;
 
   const database = getDatabase();
+  const tomorrowMorning = new Date();
+  tomorrowMorning.setUTCDate(tomorrowMorning.getUTCDate() + 1);
+  tomorrowMorning.setUTCHours(10, 0, 0, 0);
   await database
     .update(campaignOrders)
     .set({
       status: "paid",
-      stripePaymentIntentId: idFromExpandable(session.payment_intent),
+      stripePaymentIntentId: idFromExpandable(session.subscription),
       paidAt: new Date(),
       updatedAt: new Date(),
     })
@@ -35,8 +38,30 @@ async function fulfillCheckout(session: Stripe.Checkout.Session) {
 
   await database
     .update(campaigns)
-    .set({ status: "submitted", updatedAt: new Date() })
+    .set({ status: "scheduled", startsAt: tomorrowMorning, endsAt: null, updatedAt: new Date() })
     .where(eq(campaigns.id, campaignId));
+
+  await database
+    .update(creatives)
+    .set({ status: "review", updatedAt: new Date() })
+    .where(eq(creatives.campaignId, campaignId));
+
+  const activeScreens = await database
+    .select({ id: screens.id })
+    .from(screens)
+    .where(eq(screens.active, true));
+
+  if (activeScreens.length > 0) {
+    await database
+      .insert(campaignScreens)
+      .values(activeScreens.map((screen) => ({
+        campaignId,
+        screenId: screen.id,
+        priceCents: 0,
+        scheduledPlaysPerDay: 12,
+      })))
+      .onConflictDoNothing();
+  }
 
   const customerId = idFromExpandable(session.customer);
   if (customerId) {
@@ -61,6 +86,19 @@ async function markCheckoutFailed(session: Stripe.Checkout.Session) {
     );
 }
 
+async function cancelSubscription(subscription: Stripe.Subscription) {
+  const database = getDatabase();
+  const [order] = await database
+    .select({ advertiserAccountId: campaignOrders.advertiserAccountId })
+    .from(campaignOrders)
+    .where(eq(campaignOrders.stripePaymentIntentId, subscription.id))
+    .limit(1);
+  if (!order) return;
+
+  await database.update(campaignOrders).set({ status: "cancelled", updatedAt: new Date() }).where(eq(campaignOrders.stripePaymentIntentId, subscription.id));
+  await database.update(campaigns).set({ status: "paused", updatedAt: new Date() }).where(eq(campaigns.advertiserAccountId, order.advertiserAccountId));
+}
+
 export async function POST(request: Request) {
   const signature = request.headers.get("stripe-signature");
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -81,6 +119,8 @@ export async function POST(request: Request) {
       await fulfillCheckout(event.data.object);
     } else if (event.type === "checkout.session.expired" || event.type === "checkout.session.async_payment_failed") {
       await markCheckoutFailed(event.data.object);
+    } else if (event.type === "customer.subscription.deleted") {
+      await cancelSubscription(event.data.object);
     }
   } catch (error) {
     console.error(`Failed to process Stripe event ${event.id}`, error);

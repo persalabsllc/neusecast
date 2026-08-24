@@ -1,16 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { currentUser } from "@clerk/nextjs/server";
-import { desc, eq } from "drizzle-orm";
-import { ArrowRight, BadgeCheck, CalendarRange, CircleDollarSign, Clock3, Megaphone, Plus, Target } from "lucide-react";
+import { count, countDistinct, desc, eq } from "drizzle-orm";
+import { ArrowRight, BadgeCheck, BarChart3, CalendarRange, CircleDollarSign, Clock3, Edit3, Megaphone, Plus, Target } from "lucide-react";
 import { CheckoutButton } from "@/components/checkout-button";
 import { getDatabase } from "@/lib/db";
-import { advertiserAccounts, campaignOrders, campaigns } from "@/lib/db/schema";
+import { advertiserAccounts, campaignOrders, campaigns, playbackEvents } from "@/lib/db/schema";
+import { NEUSECAST_MONTHLY_PRICE } from "@/lib/pricing";
 import { createAdvertiserAccount } from "./actions";
 
 export const metadata: Metadata = {
   title: "Advertiser dashboard",
-  description: "Request, approve, and pay for NeuseCast local screen campaigns.",
+  description: "Build, manage, and measure NeuseCast local screen campaigns.",
 };
 
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
@@ -29,7 +30,7 @@ const statusCopy = {
 } as const;
 
 type AdvertiserPageProps = {
-  searchParams: Promise<{ welcome?: string; requested?: string; error?: string }>;
+  searchParams: Promise<{ welcome?: string; created?: string; error?: string }>;
 };
 
 export default async function AdvertiserPage({ searchParams }: AdvertiserPageProps) {
@@ -51,11 +52,11 @@ export default async function AdvertiserPage({ searchParams }: AdvertiserPagePro
         <section className="advertiser-onboarding-copy">
           <div className="eyebrow">Advertiser workspace</div>
           <h1>Let’s set up your business profile.</h1>
-          <p>We’ll use these details for proposals, campaign approvals, receipts, and billing. Nothing is charged when you create the profile.</p>
+          <p>We’ll use these details for campaign review, receipts, and billing. Creating your profile is free; campaigns are a transparent $75 per month.</p>
           <ul>
-            <li><BadgeCheck size={17} aria-hidden="true" /> Request a locally targeted campaign</li>
-            <li><BadgeCheck size={17} aria-hidden="true" /> Review status and approved pricing</li>
-            <li><BadgeCheck size={17} aria-hidden="true" /> Pay securely only when you are ready</li>
+            <li><BadgeCheck size={17} aria-hidden="true" /> Build and preview your own creative</li>
+            <li><BadgeCheck size={17} aria-hidden="true" /> Run on every active NeuseCast screen</li>
+            <li><BadgeCheck size={17} aria-hidden="true" /> Launch for {NEUSECAST_MONTHLY_PRICE}/month after secure checkout</li>
           </ul>
         </section>
         <form className="advertiser-form-card" action={createAdvertiserAccount}>
@@ -71,44 +72,47 @@ export default async function AdvertiserPage({ searchParams }: AdvertiserPagePro
     );
   }
 
-  const [campaignRows, orderRows] = await Promise.all([
+  const [campaignRows, orderRows, resultRows] = await Promise.all([
     database.select().from(campaigns).where(eq(campaigns.advertiserAccountId, account.id)).orderBy(desc(campaigns.createdAt)),
     database.select().from(campaignOrders).where(eq(campaignOrders.advertiserAccountId, account.id)).orderBy(desc(campaignOrders.createdAt)),
+    database.select({ campaignId: playbackEvents.campaignId, plays: count(playbackEvents.id), screens: countDistinct(playbackEvents.screenId) }).from(playbackEvents).groupBy(playbackEvents.campaignId),
   ]);
   const latestOrderByCampaign = new Map(orderRows.map((order) => [order.campaignId, order]));
-  const payableTotal = orderRows.filter((order) => order.status === "pending").reduce((total, order) => total + order.amountCents, 0);
   const liveCampaigns = campaignRows.filter((campaign) => campaign.status === "active" || campaign.status === "scheduled").length;
+  const resultsByCampaign = new Map(resultRows.map((result) => [result.campaignId, result]));
+  const totalPlays = resultRows.filter((result) => campaignRows.some((campaign) => campaign.id === result.campaignId)).reduce((sum, result) => sum + result.plays, 0);
 
   return (
     <main className="advertiser-dashboard">
       <header className="advertiser-dashboard-header">
-        <div><div className="eyebrow">{account.businessName}</div><h1>Your local campaigns.</h1><p>Request placements, approve pricing, and follow every campaign from proposal to proof of play.</p></div>
-        <Link className="button button-primary" href="/advertiser/new"><Plus size={17} aria-hidden="true" /> Request campaign</Link>
+        <div><div className="eyebrow">{account.businessName} · {NEUSECAST_MONTHLY_PRICE}/month</div><h1>Your local campaigns.</h1><p>Build creative, manage live campaigns, and follow verified screen plays from one place.</p></div>
+        <Link className="button button-primary" href="/advertiser/new"><Plus size={17} aria-hidden="true" /> Build new campaign</Link>
       </header>
 
-      {params.welcome ? <div className="portal-notice"><BadgeCheck size={18} aria-hidden="true" /><span><strong>Your advertiser account is ready.</strong> Start with a campaign request whenever you’re ready.</span></div> : null}
-      {params.requested ? <div className="portal-notice"><BadgeCheck size={18} aria-hidden="true" /><span><strong>Campaign request received.</strong> We’ll prepare screen options and pricing for your review.</span></div> : null}
+      {params.welcome ? <div className="portal-notice"><BadgeCheck size={18} aria-hidden="true" /><span><strong>Your advertiser account is ready.</strong> Design and preview your first campaign, then launch it for $75/month.</span></div> : null}
+      {params.created ? <div className="portal-notice"><BadgeCheck size={18} aria-hidden="true" /><span><strong>Your new campaign is queued.</strong> It is included with your active plan and is now waiting for creative review.</span></div> : null}
 
       <section className="advertiser-metrics" aria-label="Campaign summary">
         <article><span><Megaphone size={18} aria-hidden="true" /></span><div><small>Campaigns</small><strong>{campaignRows.length}</strong></div></article>
         <article><span><Target size={18} aria-hidden="true" /></span><div><small>Live or scheduled</small><strong>{liveCampaigns}</strong></div></article>
-        <article><span><CircleDollarSign size={18} aria-hidden="true" /></span><div><small>Ready for payment</small><strong>{currency.format(payableTotal / 100)}</strong></div></article>
+        <article><span><BarChart3 size={18} aria-hidden="true" /></span><div><small>Verified plays</small><strong>{totalPlays.toLocaleString()}</strong></div></article>
       </section>
 
       <section className="advertiser-campaign-section">
-        <div className="section-title-row"><div><span>Campaign workspace</span><h2>Requests and orders</h2></div><p>Payment appears only after the NeuseCast team approves placement and pricing.</p></div>
+        <div className="section-title-row"><div><span>Campaign workspace</span><h2>Creative, status, and results</h2></div><p>Every campaign is $75/month and includes all active screens. Paid creative queues for the following broadcast day.</p></div>
         {campaignRows.length === 0 ? (
-          <div className="advertiser-empty-state"><span><Megaphone size={25} aria-hidden="true" /></span><h3>Your first local campaign starts here.</h3><p>Tell us what you’re promoting and when you want it seen. We’ll build a clear proposal around available local screens.</p><Link className="button button-primary" href="/advertiser/new">Request your first campaign <ArrowRight size={17} aria-hidden="true" /></Link></div>
+          <div className="advertiser-empty-state"><span><Megaphone size={25} aria-hidden="true" /></span><h3>Your first local campaign starts here.</h3><p>Build the ad, preview it, and subscribe in one sitting. No proposal, sales call, or waiting period required.</p><Link className="button button-primary" href="/advertiser/new">Build your first campaign <ArrowRight size={17} aria-hidden="true" /></Link></div>
         ) : (
           <div className="advertiser-campaign-list">
             {campaignRows.map((campaign) => {
               const order = latestOrderByCampaign.get(campaign.id);
               const canPay = order?.status === "pending" && order.amountCents > 0;
+              const results = resultsByCampaign.get(campaign.id);
               return (
                 <article className="advertiser-campaign-row" key={campaign.id}>
                   <div className="campaign-row-main"><span className={`status-badge status-${campaign.status}`}><span className="status-dot" aria-hidden="true" />{statusCopy[campaign.status]}</span><h3>{campaign.name}</h3><p>{campaign.objective}</p></div>
-                  <dl><div><dt><CalendarRange size={14} aria-hidden="true" /> Flight</dt><dd>{campaign.startsAt && campaign.endsAt ? `${date.format(campaign.startsAt)} – ${date.format(campaign.endsAt)}` : "Dates under review"}</dd></div><div><dt><CircleDollarSign size={14} aria-hidden="true" /> Approved total</dt><dd>{order ? currency.format(order.amountCents / 100) : "Proposal pending"}</dd></div></dl>
-                  <div className="campaign-row-action">{canPay && order ? <CheckoutButton orderId={order.id} /> : order?.status === "paid" ? <span className="paid-label"><BadgeCheck size={16} aria-hidden="true" /> Paid</span> : <span className="review-label"><Clock3 size={16} aria-hidden="true" /> We’re preparing your proposal</span>}</div>
+                  <dl><div><dt><CalendarRange size={14} aria-hidden="true" /> Broadcast</dt><dd>{campaign.startsAt ? `From ${date.format(campaign.startsAt)}` : "Starts after checkout"}</dd></div><div><dt><BarChart3 size={14} aria-hidden="true" /> Results</dt><dd>{results ? `${results.plays.toLocaleString()} plays · ${results.screens} screens` : "Awaiting first verified play"}</dd></div><div><dt><CircleDollarSign size={14} aria-hidden="true" /> Subscription</dt><dd>{order ? `${currency.format(order.amountCents / 100)}/month` : "$75/month"}</dd></div></dl>
+                  <div className="campaign-row-action">{canPay && order ? <CheckoutButton orderId={order.id} /> : <><Link className="button button-secondary button-small" href={`/advertiser/campaign/${campaign.id}`}><Edit3 size={15} aria-hidden="true" /> Edit</Link>{order?.status === "paid" ? <span className="paid-label"><BadgeCheck size={16} aria-hidden="true" /> Subscribed</span> : <span className="review-label"><Clock3 size={16} aria-hidden="true" /> Draft</span>}</>}</div>
                 </article>
               );
             })}

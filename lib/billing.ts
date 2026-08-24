@@ -6,6 +6,7 @@ import {
   campaigns,
 } from "@/lib/db/schema";
 import { getApplicationUrl, getStripe } from "@/lib/stripe";
+import { NEUSECAST_PLAN } from "@/lib/pricing";
 
 export class BillingError extends Error {
   constructor(
@@ -48,7 +49,9 @@ export async function createCampaignCheckout(orderId: string, clerkUserId: strin
   if (order.status === "cancelled" || order.status === "refunded") {
     throw new BillingError("This campaign order is no longer payable.", 409);
   }
-  if (order.amountCents < 50) throw new BillingError("Campaign total is invalid.", 400);
+  if (order.amountCents !== NEUSECAST_PLAN.amountCents || order.currency !== NEUSECAST_PLAN.currency) {
+    throw new BillingError("Campaign subscription price is invalid.", 400);
+  }
 
   const stripe = getStripe();
   let customerId = order.stripeCustomerId;
@@ -71,7 +74,7 @@ export async function createCampaignCheckout(orderId: string, clerkUserId: strin
 
   const applicationUrl = getApplicationUrl();
   const session = await stripe.checkout.sessions.create({
-    mode: "payment",
+    mode: "subscription",
     customer: customerId,
     client_reference_id: order.id,
     line_items: [
@@ -79,10 +82,11 @@ export async function createCampaignCheckout(orderId: string, clerkUserId: strin
         quantity: 1,
         price_data: {
           currency: order.currency.toLowerCase(),
-          unit_amount: order.amountCents,
+          unit_amount: NEUSECAST_PLAN.amountCents,
+          recurring: { interval: NEUSECAST_PLAN.interval },
           product_data: {
-            name: `NeuseCast campaign · ${order.campaignName}`,
-            description: "Managed digital-screen advertising across selected Eastern Carolina locations.",
+            name: NEUSECAST_PLAN.name,
+            description: "One campaign on every active NeuseCast screen, billed monthly.",
           },
         },
       },
@@ -92,7 +96,7 @@ export async function createCampaignCheckout(orderId: string, clerkUserId: strin
       campaignId: order.campaignId,
       advertiserAccountId: order.advertiserAccountId,
     },
-    payment_intent_data: {
+    subscription_data: {
       metadata: {
         orderId: order.id,
         campaignId: order.campaignId,
