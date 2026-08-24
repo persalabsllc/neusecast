@@ -134,6 +134,7 @@ export async function getPlayerManifest(
         mediaUrl: creatives.mediaUrl,
         durationSeconds: creatives.durationSeconds,
         metadata: creatives.metadata,
+        expiresAt: campaigns.endsAt,
       })
       .from(creatives)
       .innerJoin(campaigns, eq(creatives.campaignId, campaigns.id))
@@ -157,6 +158,7 @@ export async function getPlayerManifest(
         callToAction: hostContent.callToAction,
         mediaUrl: hostContent.mediaUrl,
         template: hostContent.template,
+        expiresAt: hostContent.endsAt,
       })
       .from(hostContent)
       .where(
@@ -179,6 +181,7 @@ export async function getPlayerManifest(
         sourceName: generatedContent.sourceName,
         artworkUrl: generatedContent.artworkUrl,
         metadata: generatedContent.metadata,
+        expiresAt: generatedContent.expiresAt,
       })
       .from(generatedContent)
       .where(
@@ -211,6 +214,7 @@ export async function getPlayerManifest(
     mediaUrl: row.mediaUrl,
     theme: resolveTheme(row.metadata, "coral"),
     sponsor: metadataString(row.metadata, "sponsor"),
+    expiresAt: row.expiresAt?.toISOString() ?? null,
   }));
 
   const hostItems: PlayerItem[] = hostRows.map((row) => ({
@@ -227,6 +231,7 @@ export async function getPlayerManifest(
     mediaUrl: row.mediaUrl,
     theme: THEMES.has(row.template as PlayerTheme) ? (row.template as PlayerTheme) : HOST_THEMES[row.template] ?? "aqua",
     sponsor: screen.venueName,
+    expiresAt: row.expiresAt?.toISOString() ?? null,
   }));
 
   const fillerItems: PlayerItem[] = selectBalancedFiller(generatedRows).map((row) => ({
@@ -243,6 +248,7 @@ export async function getPlayerManifest(
     mediaUrl: row.artworkUrl,
     theme: resolveTheme(row.metadata, "navy"),
     sponsor: row.sourceName,
+    expiresAt: row.expiresAt?.toISOString() ?? null,
   }));
 
   const items = interleaveRotation(advertisements, hostItems, fillerItems);

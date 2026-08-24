@@ -299,6 +299,7 @@ export function PlayerRuntime({
     offsetMs: clockOffset(initialManifest.serverTime),
     timeZone: initialManifest.venue.timeZone || DEFAULT_TIME_ZONE,
   }));
+  const [serverNowMs, setServerNowMs] = useState(() => Date.now() + clockOffset(initialManifest.serverTime));
   const initialManifestAgeMs = manifestAgeAtServerTime(initialManifest);
   const [manifestExpired, setManifestExpired] = useState(
     () => initialManifestAgeMs > MAX_CACHED_MANIFEST_AGE_MS,
@@ -316,7 +317,13 @@ export function PlayerRuntime({
   const pairingTokenRef = useRef(pairingToken ?? null);
   const flushingPlayback = useRef(false);
   const refreshingManifest = useRef(false);
-  const currentItem = manifest.items[activeIndex] ?? null;
+  const playableItems = useMemo(() => manifest.items.filter((item) => {
+    if (!item.expiresAt) return true;
+    const expiresAt = Date.parse(item.expiresAt);
+    return Number.isFinite(expiresAt) && expiresAt > serverNowMs;
+  }), [manifest.items, serverNowMs]);
+  const displayedIndex = activeIndex < playableItems.length ? activeIndex : 0;
+  const currentItem = playableItems[displayedIndex] ?? null;
 
   const location = useMemo(
     () => `${manifest.venue.city}, ${manifest.venue.state}`,
@@ -326,6 +333,7 @@ export function PlayerRuntime({
   const syncServerClock = useCallback((serverTime: string, timeZone?: string) => {
     const offsetMs = clockOffset(serverTime);
     clockOffsetRef.current = offsetMs;
+    setServerNowMs(Date.now() + offsetMs);
     setClockSync({
       offsetMs,
       timeZone: timeZone || DEFAULT_TIME_ZONE,
@@ -539,7 +547,9 @@ export function PlayerRuntime({
     }
 
     const updateClock = () => {
-      setClock(formatter.format(new Date(Date.now() + clockSync.offsetMs)));
+      const now = Date.now() + clockSync.offsetMs;
+      setServerNowMs(now);
+      setClock(formatter.format(new Date(now)));
     };
     updateClock();
     const interval = window.setInterval(updateClock, 15_000);
@@ -671,13 +681,13 @@ export function PlayerRuntime({
           playedAt: new Date(Date.now() + clockOffsetRef.current).toISOString(),
         });
       }
-      setActiveIndex((index) => (index + 1) % manifest.items.length);
+      setActiveIndex((displayedIndex + 1) % playableItems.length);
     }, currentItem.durationSeconds * 1000);
 
     return () => {
       window.clearTimeout(advance);
     };
-  }, [accessRevoked, currentItem, manifest.items.length, manifestExpired, playerVersion, preview, sendPlayback]);
+  }, [accessRevoked, currentItem, displayedIndex, manifestExpired, playableItems.length, playerVersion, preview, sendPlayback]);
 
   if (accessRevoked) {
     return (
@@ -747,12 +757,12 @@ export function PlayerRuntime({
 
       <footer className="player-footer">
         <span>{manifest.venue.name}</span>
-        <span className="player-position">{activeIndex + 1} / {manifest.items.length}</span>
+        <span className="player-position">{displayedIndex + 1} / {playableItems.length}</span>
         <span>{preview ? "Control Room playlist preview" : "Eastern Carolina's local screen network"}</span>
       </footer>
 
       <div className="player-progress" aria-hidden="true">
-        <PlayerProgress key={`${manifest.version}:${activeIndex}:${currentItem.id}`} durationSeconds={currentItem.durationSeconds} />
+        <PlayerProgress key={`${manifest.version}:${displayedIndex}:${currentItem.id}`} durationSeconds={currentItem.durationSeconds} />
       </div>
     </main>
   );

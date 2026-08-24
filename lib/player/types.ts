@@ -16,6 +16,7 @@ export type PlayerItem = {
   mediaUrl: string | null;
   theme: PlayerTheme;
   sponsor: string | null;
+  expiresAt?: string | null;
 };
 
 export type PlayerManifest = {
