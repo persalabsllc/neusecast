@@ -4451,3 +4451,56 @@ textarea:focus-visible {
   width: 100%;
   margin-top: 19px;
 }
+
+/* Billing outcomes */
+.billing-result-page {
+  display: grid;
+  min-height: 100svh;
+  place-items: center;
+  padding: 28px;
+  background:
+    radial-gradient(circle at 70% 18%, rgba(67, 221, 193, 0.13), transparent 29rem),
+    var(--ink-950);
+}
+
+.billing-result-card {
+  display: flex;
+  width: min(100%, 610px);
+  align-items: flex-start;
+  flex-direction: column;
+  padding: clamp(28px, 6vw, 58px);
+  border: 1px solid var(--line-strong);
+  border-radius: 28px;
+  background: linear-gradient(145deg, rgba(67, 221, 193, 0.07), rgba(255, 255, 255, 0.025));
+  box-shadow: var(--shadow);
+}
+
+.billing-result-icon {
+  display: grid;
+  width: 66px;
+  height: 66px;
+  place-items: center;
+  margin-bottom: 30px;
+  border-radius: 20px;
+  background: rgba(67, 221, 193, 0.14);
+  color: var(--tide);
+}
+
+.billing-result-icon-muted {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--muted-bright);
+}
+
+.billing-result-card h1 {
+  margin: 18px 0 16px;
+  font-size: clamp(36px, 7vw, 62px);
+  letter-spacing: -0.055em;
+  line-height: 1;
+}
+
+.billing-result-card p {
+  margin: 0 0 30px;
+  color: var(--muted-bright);
+  font-size: 17px;
+  line-height: 1.65;
+}
