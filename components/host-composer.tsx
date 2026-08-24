@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties, FormEvent } from "react";
+import type { CSSProperties } from "react";
 import { useState } from "react";
 import {
   CalendarDays,
@@ -11,7 +11,6 @@ import {
   MapPin,
   Megaphone,
   PartyPopper,
-  Save,
   Send,
   Sparkles,
   Store,
@@ -19,6 +18,7 @@ import {
   WandSparkles,
   type LucideIcon,
 } from "lucide-react";
+import { submitHostContent } from "@/app/host/actions";
 
 type TemplateId = "special" | "event" | "announcement" | "menu";
 
@@ -64,13 +64,6 @@ const templates: Template[] = [
     accent: "#e9879b",
     icon: Utensils,
   },
-];
-
-const venueOptions = [
-  "The Chelsea — Dining room",
-  "Baker’s Kitchen — Front counter",
-  "Carolina Colours — Clubhouse",
-  "Captain Ratty’s — Upstairs bar",
 ];
 
 const fieldDefaults: Record<
@@ -124,19 +117,18 @@ function formatSchedule(date: string, time: string) {
   return `Starts ${label} at ${timeLabel}`;
 }
 
-export function HostComposer() {
+type HostScreenOption = { id: string; label: string };
+
+export function HostComposer({ screens }: { screens: HostScreenOption[] }) {
   const [templateId, setTemplateId] = useState<TemplateId>("special");
   const [headline, setHeadline] = useState(fieldDefaults.special.headline);
   const [body, setBody] = useState(fieldDefaults.special.body);
   const [detail, setDetail] = useState(fieldDefaults.special.detail);
   const [cta, setCta] = useState(fieldDefaults.special.cta);
-  const [venue, setVenue] = useState(venueOptions[0]);
+  const [screenId, setScreenId] = useState(screens[0]?.id ?? "");
   const [startDate, setStartDate] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [submissionState, setSubmissionState] = useState<
-    "idle" | "draft" | "submitted"
-  >("idle");
 
   const activeTemplate =
     templates.find((template) => template.id === templateId) ?? templates[0];
@@ -145,6 +137,7 @@ export function HostComposer() {
   const previewStyle = {
     "--preview-accent": activeTemplate.accent,
   } as CSSProperties;
+  const selectedScreen = screens.find((screen) => screen.id === screenId) ?? screens[0];
 
   function chooseTemplate(nextTemplate: Template) {
     const defaults = fieldDefaults[nextTemplate.id];
@@ -153,12 +146,6 @@ export function HostComposer() {
     setBody(defaults.body);
     setDetail(defaults.detail);
     setCta(defaults.cta);
-    setSubmissionState("idle");
-  }
-
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSubmissionState("submitted");
   }
 
   return (
@@ -176,13 +163,16 @@ export function HostComposer() {
         <div className="host-demo-notice" role="status">
           <Info size={18} aria-hidden="true" />
           <div>
-            <strong>Demo mode</strong>
-            <span>Nothing is saved or sent to a screen yet.</span>
+            <strong>Your assigned screen</strong>
+            <span>Changes here affect only the location you select below.</span>
           </div>
         </div>
       </section>
 
-      <form className="host-composer" onSubmit={handleSubmit}>
+      <form className="host-composer" action={submitHostContent}>
+        <input type="hidden" name="template" value={templateId} />
+        <input type="hidden" name="startsAt" value={startDate ? `${startDate}T${startTime || "00:00"}` : ""} />
+        <input type="hidden" name="endsAt" value={endDate ? `${endDate}T23:59` : ""} />
         <section className="host-editor" aria-label="Create screen content">
           <div className="host-section-heading">
             <span className="host-step">01</span>
@@ -237,13 +227,11 @@ export function HostComposer() {
                 <span className="field-label">Headline</span>
                 <input
                   type="text"
+                  name="headline"
                   value={headline}
                   maxLength={52}
                   required
-                  onChange={(event) => {
-                    setHeadline(event.target.value);
-                    setSubmissionState("idle");
-                  }}
+                  onChange={(event) => setHeadline(event.target.value)}
                   aria-describedby="headline-help"
                 />
                 <span className="field-help" id="headline-help">
@@ -255,13 +243,11 @@ export function HostComposer() {
                 <span className="field-label">Supporting text</span>
                 <textarea
                   value={body}
+                  name="body"
                   rows={3}
                   maxLength={120}
                   required
-                  onChange={(event) => {
-                    setBody(event.target.value);
-                    setSubmissionState("idle");
-                  }}
+                  onChange={(event) => setBody(event.target.value)}
                   aria-describedby="body-help"
                 />
                 <span className="field-help" id="body-help">
@@ -277,12 +263,10 @@ export function HostComposer() {
                 </span>
                 <input
                   type="text"
+                  name="detail"
                   value={detail}
                   maxLength={32}
-                  onChange={(event) => {
-                    setDetail(event.target.value);
-                    setSubmissionState("idle");
-                  }}
+                  onChange={(event) => setDetail(event.target.value)}
                 />
               </label>
 
@@ -290,12 +274,10 @@ export function HostComposer() {
                 <span className="field-label">Call to action</span>
                 <input
                   type="text"
+                  name="callToAction"
                   value={cta}
                   maxLength={52}
-                  onChange={(event) => {
-                    setCta(event.target.value);
-                    setSubmissionState("idle");
-                  }}
+                  onChange={(event) => setCta(event.target.value)}
                 />
               </label>
             </div>
@@ -315,10 +297,10 @@ export function HostComposer() {
                 <span className="field-label">
                   <MapPin size={15} aria-hidden="true" /> Venue screen
                 </span>
-                <select value={venue} onChange={(event) => setVenue(event.target.value)}>
-                  {venueOptions.map((option) => (
-                    <option value={option} key={option}>
-                      {option}
+                <select name="screenId" value={screenId} onChange={(event) => setScreenId(event.target.value)} required>
+                  {screens.map((screen) => (
+                    <option value={screen.id} key={screen.id}>
+                      {screen.label}
                     </option>
                   ))}
                 </select>
@@ -362,26 +344,14 @@ export function HostComposer() {
           </div>
 
           <div className="host-actions">
-            <button
-              className="button button-secondary"
-              type="button"
-              onClick={() => setSubmissionState("draft")}
-            >
-              <Save size={17} aria-hidden="true" />
-              Save demo draft
-            </button>
             <button className="button button-primary" type="submit">
               <Send size={17} aria-hidden="true" />
-              Submit for approval
+              Publish to this screen
             </button>
           </div>
 
           <p className="host-submit-status" aria-live="polite">
-            {submissionState === "draft"
-              ? "Demo draft captured for this session. It has not been stored."
-              : submissionState === "submitted"
-                ? "Preview submitted in demo mode. No screen or approver was contacted."
-                : "Host submissions will enter the NeuseCast approval queue before airing."}
+            Local venue content publishes only to the selected screen. NeuseCast can still review or remove it from the Control Room.
           </p>
         </section>
 
@@ -416,7 +386,7 @@ export function HostComposer() {
               </div>
 
               <div className="preview-brand-bar">
-                <span><Store size={14} aria-hidden="true" /> {venue.split(" — ")[0]}</span>
+                <span><Store size={14} aria-hidden="true" /> {selectedScreen?.label.split(" — ")[0] ?? "Your venue"}</span>
                 <span>NEUSECAST</span>
               </div>
             </div>
