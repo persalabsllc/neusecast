@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getDatabase } from "@/lib/db";
 import { verifiedPrimaryEmail } from "@/lib/auth-email";
+import { isControlRoomEmail } from "@/lib/control-room-access";
 import { generatedContent } from "@/lib/db/schema";
 import {
   FILLER_CATEGORIES,
@@ -15,17 +16,10 @@ import {
 } from "@/lib/filler/constants";
 import { generateAutomaticFiller } from "@/lib/filler/generator";
 
-const controlRoomEmails = new Set(
-  (process.env.CONTROL_ROOM_EMAILS ?? "persalabsllc@gmail.com")
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean),
-);
-
 async function requireControlUser() {
   const user = await currentUser();
   const email = verifiedPrimaryEmail(user);
-  if (!user || !email || !controlRoomEmails.has(email)) {
+  if (!user || !isControlRoomEmail(email)) {
     throw new Error("Control Room authorization required.");
   }
   return user;

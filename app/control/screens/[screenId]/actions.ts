@@ -5,15 +5,14 @@ import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDatabase } from "@/lib/db";
 import { verifiedPrimaryEmail } from "@/lib/auth-email";
+import { isControlRoomEmail } from "@/lib/control-room-access";
 import { ensureScreenManagementSchema } from "@/lib/db/ensure-screen-management";
 import { appUsers, screenAdvertiserBlocks } from "@/lib/db/schema";
-
-const controlRoomEmails = new Set((process.env.CONTROL_ROOM_EMAILS ?? "persalabsllc@gmail.com").split(",").map((email) => email.trim().toLowerCase()).filter(Boolean));
 
 async function requireControlUser() {
   const user = await currentUser();
   const email = verifiedPrimaryEmail(user);
-  if (!user || !email || !controlRoomEmails.has(email)) throw new Error("Control Room authorization required.");
+  if (!user || !email || !isControlRoomEmail(email)) throw new Error("Control Room authorization required.");
   return { user, email };
 }
 

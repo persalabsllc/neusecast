@@ -5,19 +5,13 @@ import { currentUser } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { getDatabase } from "@/lib/db";
 import { verifiedPrimaryEmail } from "@/lib/auth-email";
+import { isControlRoomEmail } from "@/lib/control-room-access";
 import { advertiserAccounts, campaigns, creatives } from "@/lib/db/schema";
-
-const controlRoomEmails = new Set(
-  (process.env.CONTROL_ROOM_EMAILS ?? "persalabsllc@gmail.com")
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean),
-);
 
 async function requireControlUser() {
   const user = await currentUser();
   const email = verifiedPrimaryEmail(user);
-  if (!email || !controlRoomEmails.has(email)) throw new Error("Control Room authorization required.");
+  if (!isControlRoomEmail(email)) throw new Error("Control Room authorization required.");
 }
 
 export async function approveCreative(formData: FormData) {

@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { PlayerRuntime } from "@/components/player-runtime";
 import { getDatabase } from "@/lib/db";
 import { verifiedPrimaryEmail } from "@/lib/auth-email";
+import { isControlRoomEmail } from "@/lib/control-room-access";
 import { screens } from "@/lib/db/schema";
 import {
   authorizePlayerBootstrap,
@@ -21,13 +22,6 @@ export const metadata: Metadata = {
   description: "NeuseCast digital signage player",
   robots: { index: false, follow: false },
 };
-
-const controlRoomEmails = new Set(
-  (process.env.CONTROL_ROOM_EMAILS ?? "persalabsllc@gmail.com")
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean),
-);
 
 function queryValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
@@ -48,7 +42,7 @@ export default async function PlayerPage({
   if (preview) {
     const user = await currentUser();
     const email = verifiedPrimaryEmail(user);
-    if (!email || !controlRoomEmails.has(email)) notFound();
+    if (!isControlRoomEmail(email)) notFound();
     const [screen] = await getDatabase()
       .select({
         active: screens.active,

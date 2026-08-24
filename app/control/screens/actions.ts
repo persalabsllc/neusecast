@@ -8,11 +8,10 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getDatabase } from "@/lib/db";
 import { verifiedPrimaryEmail } from "@/lib/auth-email";
+import { isControlRoomEmail } from "@/lib/control-room-access";
 import { ensureScreenManagementSchema } from "@/lib/db/ensure-screen-management";
 import { appUsers, campaignScreens, campaigns, screens, venues } from "@/lib/db/schema";
 import { createPlayerPairingToken, pairingCookieName } from "@/lib/player/pairing";
-
-const controlRoomEmails = new Set((process.env.CONTROL_ROOM_EMAILS ?? "persalabsllc@gmail.com").split(",").map((email) => email.trim().toLowerCase()).filter(Boolean));
 
 function value(formData: FormData, key: string, max = 200) {
   const raw = formData.get(key);
@@ -32,7 +31,7 @@ function timeZoneValue(formData: FormData) {
 async function requireControlUser() {
   const user = await currentUser();
   const email = verifiedPrimaryEmail(user);
-  if (!user || !email || !controlRoomEmails.has(email)) throw new Error("Control Room authorization required.");
+  if (!user || !isControlRoomEmail(email)) throw new Error("Control Room authorization required.");
   return user;
 }
 
