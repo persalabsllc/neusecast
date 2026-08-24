@@ -1139,7 +1139,7 @@ textarea:focus-visible {
   line-height: 1.55;
 }
 
-.host-demo-notice {
+.host-scope-notice {
   display: flex;
   min-width: 240px;
   align-items: flex-start;
@@ -1151,17 +1151,17 @@ textarea:focus-visible {
   color: var(--sun);
 }
 
-.host-demo-notice div,
+.host-scope-notice div,
 .preview-summary span {
   display: grid;
   gap: 3px;
 }
 
-.host-demo-notice strong {
+.host-scope-notice strong {
   font-size: 13px;
 }
 
-.host-demo-notice span {
+.host-scope-notice span {
   color: #c5b78f;
   font-size: 12px;
 }

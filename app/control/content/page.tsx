@@ -1,131 +1,26 @@
-import {
-  CalendarDays,
-  Check,
-  ChevronRight,
-  Clock3,
-  FileWarning,
-  Filter,
-  ImagePlus,
-  Plus,
-  Search,
-  Sparkles,
-} from "lucide-react";
-import { contentItems, type ContentStatus, type ContentType } from "@/lib/demo-data";
+import { desc, eq } from "drizzle-orm";
+import { Check, Clock3, Megaphone, MonitorPlay } from "lucide-react";
+import { ensureScreenManagementSchema } from "@/lib/db/ensure-screen-management";
+import { getDatabase } from "@/lib/db";
+import { advertiserAccounts, campaigns, creatives, hostContent, screens, venues } from "@/lib/db/schema";
 
-const statusLabels: Record<ContentStatus, string> = {
-  approved: "Approved",
-  pending: "Awaiting review",
-  revision: "Needs revision",
-  scheduled: "Auto-scheduled",
-};
+export const dynamic = "force-dynamic";
 
-const typeAbbreviations: Record<ContentType, string> = {
-  "Host message": "HOST",
-  Advertisement: "AD",
-  Weather: "WX",
-  Community: "EVENT",
-  "Local news": "NEWS",
-  Filler: "LOCAL",
-};
+export default async function ContentPage() {
+  await ensureScreenManagementSchema();
+  const db = getDatabase();
+  const [adRows, hostRows] = await Promise.all([
+    db.select({ id: creatives.id, name: creatives.name, headline: creatives.headline, status: creatives.status, duration: creatives.durationSeconds, campaign: campaigns.name, business: advertiserAccounts.businessName, updatedAt: creatives.updatedAt }).from(creatives).innerJoin(campaigns, eq(creatives.campaignId, campaigns.id)).innerJoin(advertiserAccounts, eq(campaigns.advertiserAccountId, advertiserAccounts.id)).orderBy(desc(creatives.updatedAt)),
+    db.select({ id: hostContent.id, headline: hostContent.headline, status: hostContent.status, venue: venues.name, screen: screens.name, startsAt: hostContent.startsAt, endsAt: hostContent.endsAt }).from(hostContent).innerJoin(venues, eq(hostContent.venueId, venues.id)).leftJoin(screens, eq(hostContent.screenId, screens.id)).orderBy(desc(hostContent.updatedAt)),
+  ]);
+  const reviewCount = adRows.filter((item) => item.status === "review").length;
+  const approvedCount = adRows.filter((item) => item.status === "approved").length;
+  const liveHostCount = hostRows.filter((item) => ["scheduled", "approved"].includes(item.status)).length;
 
-export default function ContentPage() {
-  const approvedCount = contentItems.filter((item) => item.status === "approved").length;
-  const pendingCount = contentItems.filter((item) => item.status === "pending").length;
-  const automatedCount = contentItems.filter((item) => item.status === "scheduled").length;
-
-  return (
-    <div className="control-page">
-      <header className="page-header">
-        <div>
-          <p className="eyebrow">Creative library</p>
-          <h1>Content</h1>
-          <p className="page-description">
-            Review host submissions, manage creative, and keep automated local content ready to air.
-          </p>
-        </div>
-        <div className="page-actions">
-          <button className="button button-secondary" type="button">
-            <Sparkles size={16} aria-hidden="true" /> Generate local filler
-          </button>
-          <button className="button button-primary" type="button">
-            <Plus size={16} aria-hidden="true" /> New content
-          </button>
-        </div>
-      </header>
-
-      <section className="metric-grid metric-grid-3" aria-label="Content library summary">
-        <article className="metric-card compact-metric-card">
-          <span className="metric-icon metric-icon-gold"><Clock3 size={18} aria-hidden="true" /></span>
-          <div><p className="metric-label">Awaiting review</p><p className="metric-value">{pendingCount}</p></div>
-          <span className="metric-callout">Host supplied</span>
-        </article>
-        <article className="metric-card compact-metric-card">
-          <span className="metric-icon metric-icon-green"><Check size={18} aria-hidden="true" /></span>
-          <div><p className="metric-label">Ready to air</p><p className="metric-value">{approvedCount}</p></div>
-          <span className="metric-callout">In active rotation</span>
-        </article>
-        <article className="metric-card compact-metric-card">
-          <span className="metric-icon metric-icon-teal"><Sparkles size={18} aria-hidden="true" /></span>
-          <div><p className="metric-label">Automated feeds</p><p className="metric-value">{automatedCount + 3}</p></div>
-          <span className="metric-callout">Healthy</span>
-        </article>
-      </section>
-
-      <section className="panel">
-        <div className="panel-toolbar panel-toolbar-wrap">
-          <div className="segmented-control" aria-label="Filter content">
-            <button className="segment is-active" type="button">All <span>{contentItems.length}</span></button>
-            <button className="segment" type="button">Review queue <span>{pendingCount + 1}</span></button>
-            <button className="segment" type="button">Advertisements</button>
-            <button className="segment" type="button">Automated</button>
-          </div>
-          <div className="toolbar-actions">
-            <label className="search-field">
-              <Search size={16} aria-hidden="true" />
-              <span className="sr-only">Search content</span>
-              <input type="search" placeholder="Search content" />
-            </label>
-            <button className="icon-button icon-button-bordered" type="button" aria-label="Filter content">
-              <Filter size={17} aria-hidden="true" />
-            </button>
-          </div>
-        </div>
-
-        <div className="content-list">
-          {contentItems.map((item) => (
-            <article className="content-row" key={item.id}>
-              <div className={`creative-thumb creative-thumb-${item.accent}`} aria-hidden="true">
-                <span>{typeAbbreviations[item.type]}</span>
-                {item.type === "Advertisement" ? <ImagePlus size={21} /> : <Sparkles size={21} />}
-              </div>
-              <div className="content-main">
-                <div className="content-title-line">
-                  <h2>{item.title}</h2>
-                  <span className={`status-badge status-${item.status}`}>
-                    <span className="status-dot" aria-hidden="true" />
-                    {statusLabels[item.status]}
-                  </span>
-                </div>
-                <p>{item.owner}</p>
-                <div className="metadata-row">
-                  <span><Clock3 size={13} aria-hidden="true" /> {item.duration} sec</span>
-                  <span><CalendarDays size={13} aria-hidden="true" /> {item.submitted}</span>
-                  <span>{item.destinations}</span>
-                </div>
-                {item.note && (
-                  <p className={`content-note ${item.status === "revision" ? "content-note-warning" : ""}`}>
-                    {item.status === "revision" && <FileWarning size={14} aria-hidden="true" />}
-                    {item.note}
-                  </p>
-                )}
-              </div>
-              <button className="icon-button row-chevron" type="button" aria-label={`Open ${item.title}`}>
-                <ChevronRight size={18} aria-hidden="true" />
-              </button>
-            </article>
-          ))}
-        </div>
-      </section>
-    </div>
-  );
+  return <div className="control-page">
+    <header className="page-header"><div><p className="eyebrow">Live creative library</p><h1>Content</h1><p className="page-description">Advertiser creative is reviewed before airing. Host content publishes immediately to its own screen.</p></div></header>
+    <section className="metric-grid metric-grid-3"><article className="metric-card compact-metric-card"><span className="metric-icon metric-icon-gold"><Clock3 size={18} /></span><div><p className="metric-label">Advertiser review</p><p className="metric-value">{reviewCount}</p></div><span className="metric-callout">Admin approval required</span></article><article className="metric-card compact-metric-card"><span className="metric-icon metric-icon-green"><Check size={18} /></span><div><p className="metric-label">Approved ads</p><p className="metric-value">{approvedCount}</p></div><span className="metric-callout">Eligible to air</span></article><article className="metric-card compact-metric-card"><span className="metric-icon metric-icon-teal"><MonitorPlay size={18} /></span><div><p className="metric-label">Host posts</p><p className="metric-value">{liveHostCount}</p></div><span className="metric-callout">Published directly</span></article></section>
+    <section className="panel"><div className="panel-heading"><div><p className="eyebrow">Paid campaigns</p><h2>Advertiser creative</h2></div></div>{adRows.length ? <div className="content-list">{adRows.map((item) => <article className="content-row" key={item.id}><span className="metric-icon metric-icon-gold"><Megaphone size={18} /></span><div className="content-main"><div className="content-title-line"><h2>{item.headline || item.name}</h2><span className={`status-badge status-${item.status === "approved" ? "approved" : item.status === "review" ? "pending" : "revision"}`}>{item.status}</span></div><p>{item.business} · {item.campaign}</p><div className="metadata-row"><span>{item.duration} sec</span><span>Updated {item.updatedAt.toLocaleDateString()}</span></div></div></article>)}</div> : <div className="empty-state"><h3>No advertiser creative yet</h3><p>Completed advertiser onboarding will appear here for review.</p></div>}</section>
+    <section className="panel"><div className="panel-heading"><div><p className="eyebrow">Venue-owned</p><h2>Host content</h2></div></div>{hostRows.length ? <div className="content-list">{hostRows.map((item) => <article className="content-row" key={item.id}><span className="metric-icon metric-icon-teal"><MonitorPlay size={18} /></span><div className="content-main"><div className="content-title-line"><h2>{item.headline}</h2><span className={`status-badge status-${["scheduled", "approved"].includes(item.status) ? "approved" : "revision"}`}>{item.status}</span></div><p>{item.venue}{item.screen ? ` · ${item.screen}` : ""}</p><div className="metadata-row"><span>{item.startsAt ? `Starts ${item.startsAt.toLocaleString()}` : "Published immediately"}</span>{item.endsAt ? <span>Ends {item.endsAt.toLocaleString()}</span> : null}</div></div></article>)}</div> : <div className="empty-state"><h3>No host content yet</h3><p>Host posts will appear here as soon as they publish to a screen.</p></div>}</section>
+  </div>;
 }

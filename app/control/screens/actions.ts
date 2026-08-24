@@ -2,7 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { currentUser } from "@clerk/nextjs/server";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getDatabase } from "@/lib/db";
@@ -26,6 +26,7 @@ async function requireControlUser() {
 export async function activateScreen(formData: FormData) {
   await requireControlUser();
   await ensureScreenManagementSchema();
+  const existingHostId = value(formData, "existingHostId", 200);
   const hostEmail = value(formData, "hostEmail", 320).toLowerCase();
   const hostName = value(formData, "hostName", 160);
   const venueName = value(formData, "venueName");
@@ -38,12 +39,20 @@ export async function activateScreen(formData: FormData) {
   const market = value(formData, "market", 100);
   const screenName = value(formData, "screenName", 160);
   const orientation = value(formData, "orientation", 20) || "landscape";
-  if (!hostEmail.includes("@") || !venueName || !venueType || !addressLine1 || !city || !postalCode || !market || !screenName) redirect("/control/screens?error=required");
+  if ((!existingHostId && !hostEmail.includes("@")) || !venueName || !venueType || !addressLine1 || !city || !postalCode || !market || !screenName) redirect("/control/screens?error=required");
 
   const database = getDatabase();
-  const [existingHost] = await database.select({ clerkUserId: appUsers.clerkUserId }).from(appUsers).where(eq(appUsers.email, hostEmail)).limit(1);
-  const hostClerkUserId = existingHost?.clerkUserId ?? `invited:${hostEmail}`;
-  if (!existingHost) await database.insert(appUsers).values({ clerkUserId: hostClerkUserId, email: hostEmail, displayName: hostName || venueName, role: "host", status: "invited" });
+  const [selectedHost] = existingHostId
+    ? await database.select({ clerkUserId: appUsers.clerkUserId }).from(appUsers).where(and(eq(appUsers.clerkUserId, existingHostId), eq(appUsers.role, "host"))).limit(1)
+    : [];
+  if (existingHostId && !selectedHost) redirect("/control/screens?error=host");
+
+  const [emailUser] = !selectedHost
+    ? await database.select({ clerkUserId: appUsers.clerkUserId, role: appUsers.role }).from(appUsers).where(eq(appUsers.email, hostEmail)).limit(1)
+    : [];
+  if (emailUser && emailUser.role !== "host") redirect("/control/screens?error=host");
+  const hostClerkUserId = selectedHost?.clerkUserId ?? emailUser?.clerkUserId ?? `invited:${hostEmail}`;
+  if (!selectedHost && !emailUser) await database.insert(appUsers).values({ clerkUserId: hostClerkUserId, email: hostEmail, displayName: hostName || venueName, role: "host", status: "invited" });
 
   const [venue] = await database.insert(venues).values({ hostClerkUserId, name: venueName, venueType, addressLine1, addressLine2: addressLine2 || null, city, state, postalCode, market, status: "active" }).returning({ id: venues.id });
   const playerKey = `nc-${randomUUID().replaceAll("-", "").slice(0, 20)}`;

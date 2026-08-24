@@ -7,7 +7,6 @@ import {
   Check,
   Clock3,
   Eye,
-  Info,
   MapPin,
   Megaphone,
   PartyPopper,
@@ -66,38 +65,8 @@ const templates: Template[] = [
   },
 ];
 
-const fieldDefaults: Record<
-  TemplateId,
-  { headline: string; body: string; detail: string; cta: string }
-> = {
-  special: {
-    headline: "Lunch on the Neuse",
-    body: "Choose any sandwich, side, and fountain drink.",
-    detail: "$12.97",
-    cta: "Available today until 3 PM",
-  },
-  event: {
-    headline: "Downtown ArtWalk",
-    body: "Meet local artists, hear live music, and explore new work.",
-    detail: "Friday · 5–8 PM",
-    cta: "Free and open to everyone",
-  },
-  announcement: {
-    headline: "We’re opening early",
-    body: "Join us one hour earlier this Saturday for MumFest weekend.",
-    detail: "Doors open at 8 AM",
-    cta: "See you downtown",
-  },
-  menu: {
-    headline: "Carolina Shrimp & Grits",
-    body: "Local shrimp, stone-ground grits, smoked tomato, and scallions.",
-    detail: "$19",
-    cta: "Ask your server about tonight’s pairing",
-  },
-};
-
 function formatSchedule(date: string, time: string) {
-  if (!date) return "Starts when approved";
+  if (!date) return "Publishes immediately";
 
   const [year, month, day] = date.split("-").map(Number);
   const label = new Intl.DateTimeFormat("en-US", {
@@ -121,10 +90,10 @@ type HostScreenOption = { id: string; label: string };
 
 export function HostComposer({ screens }: { screens: HostScreenOption[] }) {
   const [templateId, setTemplateId] = useState<TemplateId>("special");
-  const [headline, setHeadline] = useState(fieldDefaults.special.headline);
-  const [body, setBody] = useState(fieldDefaults.special.body);
-  const [detail, setDetail] = useState(fieldDefaults.special.detail);
-  const [cta, setCta] = useState(fieldDefaults.special.cta);
+  const [headline, setHeadline] = useState("");
+  const [body, setBody] = useState("");
+  const [detail, setDetail] = useState("");
+  const [cta, setCta] = useState("");
   const [screenId, setScreenId] = useState(screens[0]?.id ?? "");
   const [startDate, setStartDate] = useState("");
   const [startTime, setStartTime] = useState("");
@@ -140,12 +109,7 @@ export function HostComposer({ screens }: { screens: HostScreenOption[] }) {
   const selectedScreen = screens.find((screen) => screen.id === screenId) ?? screens[0];
 
   function chooseTemplate(nextTemplate: Template) {
-    const defaults = fieldDefaults[nextTemplate.id];
     setTemplateId(nextTemplate.id);
-    setHeadline(defaults.headline);
-    setBody(defaults.body);
-    setDetail(defaults.detail);
-    setCta(defaults.cta);
   }
 
   return (
@@ -160,8 +124,8 @@ export function HostComposer({ screens }: { screens: HostScreenOption[] }) {
           </p>
         </div>
 
-        <div className="host-demo-notice" role="status">
-          <Info size={18} aria-hidden="true" />
+        <div className="host-scope-notice" role="status">
+          <MapPin size={18} aria-hidden="true" />
           <div>
             <strong>Your assigned screen</strong>
             <span>Changes here affect only the location you select below.</span>
@@ -288,7 +252,7 @@ export function HostComposer({ screens }: { screens: HostScreenOption[] }) {
               <span className="host-step">03</span>
               <div>
                 <h2>Choose where and when</h2>
-                <p>Target your venue screen and set an optional run window.</p>
+                <p>Target your venue screen and set an optional run window. Leaving the start blank publishes immediately.</p>
               </div>
             </div>
 

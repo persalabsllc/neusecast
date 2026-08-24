@@ -5,10 +5,8 @@ import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Bell,
   CalendarClock,
   ChevronDown,
-  CircleHelp,
   Clapperboard,
   FolderOpen,
   LayoutDashboard,
@@ -16,7 +14,6 @@ import {
   Megaphone,
   MonitorPlay,
   RadioTower,
-  Sparkles,
   X,
 } from "lucide-react";
 import { Brand } from "@/components/brand";
@@ -30,7 +27,7 @@ const primaryNavigation = [
 ] as const;
 
 const pageTitles: Record<string, { eyebrow: string; title: string }> = {
-  "/control": { eyebrow: "Network overview", title: "Good morning, Kyle" },
+  "/control": { eyebrow: "Network overview", title: "Control Room" },
   "/control/screens": { eyebrow: "Network operations", title: "Screens" },
   "/control/content": { eyebrow: "Creative library", title: "Content" },
   "/control/campaigns": { eyebrow: "Sales & delivery", title: "Campaigns" },
@@ -91,13 +88,13 @@ export function AppShell({ children }: AppShellProps) {
           </button>
         </div>
 
-        <div className="network-badge" aria-label="Active network: New Bern launch market">
+        <div className="network-badge" aria-label="NeuseCast screen network">
           <span className="network-badge-icon" aria-hidden="true">
             <RadioTower size={17} />
           </span>
           <span>
             <span className="network-badge-label">Active network</span>
-            <strong>New Bern launch market</strong>
+            <strong>NeuseCast screen network</strong>
           </span>
           <ChevronDown size={16} aria-hidden="true" />
         </div>
@@ -125,19 +122,6 @@ export function AppShell({ children }: AppShellProps) {
 
         <div className="sidebar-spacer" />
 
-        <section className="sidebar-launch-card" aria-labelledby="launch-card-title">
-          <span className="sidebar-launch-icon" aria-hidden="true">
-            <Sparkles size={17} />
-          </span>
-          <div>
-            <strong id="launch-card-title">Launch checklist</strong>
-            <p>3 of 6 steps complete</p>
-          </div>
-          <span className="launch-progress" aria-hidden="true">
-            <span />
-          </span>
-        </section>
-
         <Link
           className="sidebar-nav-link host-portal-link"
           href="/host"
@@ -150,11 +134,11 @@ export function AppShell({ children }: AppShellProps) {
 
         <div className="sidebar-profile">
           <span className="profile-avatar" aria-hidden="true">
-            KL
+            NC
           </span>
           <span className="profile-copy">
-            <strong>Kyle</strong>
-            <small>Persa Labs · Admin</small>
+            <strong>Control Room</strong>
+            <small>NeuseCast administrator</small>
           </span>
           <UserButton />
         </div>
@@ -184,15 +168,7 @@ export function AppShell({ children }: AppShellProps) {
               <span className="status-dot status-dot-online" aria-hidden="true" />
               Live network
             </span>
-            <button className="icon-button desktop-only" type="button" aria-label="Open help center">
-              <CircleHelp size={19} aria-hidden="true" />
-            </button>
-            <button className="icon-button notification-button" type="button" aria-label="Notifications, 3 unread">
-              <Bell size={19} aria-hidden="true" />
-              <span className="notification-count" aria-hidden="true">
-                3
-              </span>
-            </button>
+            <UserButton />
           </div>
         </header>
 
