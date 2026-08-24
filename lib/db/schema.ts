@@ -119,6 +119,27 @@ export const screens = pgTable(
   ],
 );
 
+export const screenAdvertiserBlocks = pgTable(
+  "screen_advertiser_blocks",
+  {
+    screenId: uuid("screen_id")
+      .notNull()
+      .references(() => screens.id, { onDelete: "cascade" }),
+    advertiserAccountId: uuid("advertiser_account_id")
+      .notNull()
+      .references(() => advertiserAccounts.id, { onDelete: "cascade" }),
+    blockedByClerkUserId: text("blocked_by_clerk_user_id")
+      .notNull()
+      .references(() => appUsers.clerkUserId, { onDelete: "restrict" }),
+    reason: text("reason"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.screenId, table.advertiserAccountId] }),
+    index("screen_advertiser_blocks_advertiser_idx").on(table.advertiserAccountId),
+  ],
+);
+
 export const campaigns = pgTable(
   "campaigns",
   {
@@ -224,6 +245,7 @@ export const hostContent = pgTable(
     venueId: uuid("venue_id")
       .notNull()
       .references(() => venues.id, { onDelete: "cascade" }),
+    screenId: uuid("screen_id").references(() => screens.id, { onDelete: "cascade" }),
     submittedByClerkUserId: text("submitted_by_clerk_user_id")
       .notNull()
       .references(() => appUsers.clerkUserId, { onDelete: "restrict" }),
@@ -237,7 +259,7 @@ export const hostContent = pgTable(
     endsAt: timestamp("ends_at", { withTimezone: true }),
     ...timestamps,
   },
-  (table) => [index("host_content_venue_idx").on(table.venueId)],
+  (table) => [index("host_content_venue_idx").on(table.venueId), index("host_content_screen_idx").on(table.screenId)],
 );
 
 export const playbackEvents = pgTable(

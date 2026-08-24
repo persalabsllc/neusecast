@@ -118,11 +118,6 @@ export function AppShell({ children }: AppShellProps) {
               >
                 <Icon size={18} strokeWidth={1.9} aria-hidden="true" />
                 <span>{item.label}</span>
-                {item.label === "Screens" ? (
-                  <span className="nav-count" aria-label="5 screens">
-                    5
-                  </span>
-                ) : null}
               </Link>
             );
           })}
@@ -150,7 +145,7 @@ export function AppShell({ children }: AppShellProps) {
         >
           <Clapperboard size={18} strokeWidth={1.9} aria-hidden="true" />
           <span>Host portal</span>
-          <span className="nav-link-kicker">Preview</span>
+          <span className="nav-link-kicker">Live</span>
         </Link>
 
         <div className="sidebar-profile">
@@ -185,9 +180,9 @@ export function AppShell({ children }: AppShellProps) {
           </div>
 
           <div className="topbar-actions">
-            <span className="sync-status" title="Live services are not connected yet">
-              <span className="status-dot status-dot-demo" aria-hidden="true" />
-              Prototype data
+            <span className="sync-status" title="NeuseCast services connected">
+              <span className="status-dot status-dot-online" aria-hidden="true" />
+              Live network
             </span>
             <button className="icon-button desktop-only" type="button" aria-label="Open help center">
               <CircleHelp size={19} aria-hidden="true" />

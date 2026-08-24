@@ -7,14 +7,17 @@ import {
   creatives,
   generatedContent,
   hostContent,
+  screenAdvertiserBlocks,
   screens,
   venues,
 } from "@/lib/db/schema";
+import { ensureScreenManagementSchema } from "@/lib/db/ensure-screen-management";
 import type { PlayerItem, PlayerItemKind, PlayerManifest, PlayerTheme } from "./types";
 import { NEUSECAST_PLAN } from "@/lib/pricing";
 
 const THEMES = new Set<PlayerTheme>(["aqua", "navy", "coral", "gold", "blue", "green"]);
 const KINDS = new Set<PlayerItemKind>(["advertisement", "host", "weather", "event", "history", "trivia", "community"]);
+const HOST_THEMES: Record<string, PlayerTheme> = { special: "coral", event: "aqua", announcement: "blue", menu: "gold" };
 
 function metadataString(metadata: Record<string, unknown> | null, key: string) {
   const value = metadata?.[key];
@@ -51,6 +54,7 @@ function interleaveRotation(advertisements: PlayerItem[], hostItems: PlayerItem[
 }
 
 export async function getPlayerManifest(playerKey: string): Promise<PlayerManifest | null> {
+  await ensureScreenManagementSchema();
   const database = getDatabase();
   const now = new Date();
 
@@ -72,10 +76,11 @@ export async function getPlayerManifest(playerKey: string): Promise<PlayerManife
 
   if (!screen) return null;
 
-  const [creativeRows, hostRows, generatedRows] = await Promise.all([
+  const [creativeRows, hostRows, generatedRows, blockedRows] = await Promise.all([
     database
       .selectDistinct({
         id: creatives.id,
+        advertiserAccountId: campaigns.advertiserAccountId,
         campaignId: campaigns.id,
         name: creatives.name,
         headline: creatives.headline,
@@ -108,7 +113,10 @@ export async function getPlayerManifest(playerKey: string): Promise<PlayerManife
       .from(hostContent)
       .where(
         and(
-          eq(hostContent.venueId, screen.venueId),
+          or(
+            eq(hostContent.screenId, screen.id),
+            and(isNull(hostContent.screenId), eq(hostContent.venueId, screen.venueId)),
+          ),
           inArray(hostContent.status, ["approved", "scheduled"]),
           activeWindow(hostContent.startsAt, hostContent.endsAt, now),
         ),
@@ -131,9 +139,14 @@ export async function getPlayerManifest(playerKey: string): Promise<PlayerManife
           activeWindow(generatedContent.startsAt, generatedContent.expiresAt, now),
         ),
       ),
+    database
+      .select({ advertiserAccountId: screenAdvertiserBlocks.advertiserAccountId })
+      .from(screenAdvertiserBlocks)
+      .where(eq(screenAdvertiserBlocks.screenId, screen.id)),
   ]);
 
-  const advertisements: PlayerItem[] = creativeRows.map((row) => ({
+  const blockedAdvertisers = new Set(blockedRows.map((row) => row.advertiserAccountId));
+  const advertisements: PlayerItem[] = creativeRows.filter((row) => !blockedAdvertisers.has(row.advertiserAccountId)).map((row) => ({
     id: row.id,
     kind: "advertisement",
     source: "creative",
@@ -161,7 +174,7 @@ export async function getPlayerManifest(playerKey: string): Promise<PlayerManife
     body: row.body ?? `Now at ${screen.venueName}.`,
     callToAction: row.callToAction,
     mediaUrl: row.mediaUrl,
-    theme: THEMES.has(row.template as PlayerTheme) ? (row.template as PlayerTheme) : "aqua",
+    theme: THEMES.has(row.template as PlayerTheme) ? (row.template as PlayerTheme) : HOST_THEMES[row.template] ?? "aqua",
     sponsor: screen.venueName,
   }));
 
