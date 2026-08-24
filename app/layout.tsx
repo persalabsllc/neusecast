@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ClerkProvider } from "@clerk/nextjs";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -27,7 +28,19 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        {children}
+        <ClerkProvider
+          afterSignOutUrl="/"
+          appearance={{
+            variables: {
+              colorPrimary: "#43ddc1",
+              colorBackground: "#0a171c",
+              colorForeground: "#f5f7f2",
+              borderRadius: "0.75rem",
+            },
+          }}
+        >
+          {children}
+        </ClerkProvider>
       </body>
     </html>
   );

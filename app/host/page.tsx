@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { ArrowLeft, BadgeCheck } from "lucide-react";
 import { Brand } from "@/components/brand";
@@ -21,6 +22,7 @@ export default function HostPage() {
             <BadgeCheck size={15} aria-hidden="true" />
             Host workspace
           </span>
+          <UserButton />
           <Link className="button button-quiet" href="/">
             <ArrowLeft size={16} aria-hidden="true" />
             Back to NeuseCast
