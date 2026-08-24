@@ -268,14 +268,6 @@ textarea:focus-visible {
     gap: 34px;
   }
 
-  .auth-panel > .cl-rootBox {
-    width: 100%;
-  }
-
-  .auth-panel .cl-cardBox,
-  .auth-panel .cl-card {
-    width: 100%;
-  }
 }
 
 .muted {
