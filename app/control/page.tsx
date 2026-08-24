@@ -139,7 +139,7 @@ export default function ControlDashboard() {
           <p>See what is playing, what needs attention, and where there is room to sell.</p>
         </div>
         <div className="dashboard-actions">
-          <Link className="button button-secondary" href="/player/demo" target="_blank" rel="noreferrer">
+          <Link className="button button-secondary" href="/player/demo-new-bern" target="_blank" rel="noreferrer">
             <Play size={17} aria-hidden="true" /> Open live player
           </Link>
           <Link className="button button-secondary" href="/host">
@@ -243,7 +243,7 @@ export default function ControlDashboard() {
                 <span>00:08</span>
                 <span>00:12</span>
               </div>
-              <Link className="button button-primary now-running-player-link" href="/player/demo" target="_blank" rel="noreferrer">
+              <Link className="button button-primary now-running-player-link" href="/player/demo-new-bern" target="_blank" rel="noreferrer">
                 View full-screen player <ExternalLink size={16} aria-hidden="true" />
               </Link>
             </div>

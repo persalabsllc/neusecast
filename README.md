@@ -14,11 +14,11 @@ This repository now contains the first production-shaped application foundation:
 - campaign and playlist management views
 - a local-host portal with graphical content previews
 - Clerk sign-in and protected host/control routes
-- a full-screen rotating player at `/player/demo`
+- a database-driven rotating player at `/player/demo-new-bern`
 - a Neon/Drizzle schema for accounts, venues, screens, content, campaigns, playlists, billing references, and proof-of-play
 - realistic demo content so the complete on-screen experience can be evaluated before live feeds are connected
 
-The player and dashboards currently use in-app demo data. The database schema and first migration are ready; connecting a Neon database will enable persistence without changing the player design. Stripe checkout, screen telemetry, and automated feeds remain the next integration layer.
+The live player now reads its assigned rotation from Neon, refreshes its manifest automatically, sends a heartbeat, and records proof-of-play events. The control dashboards still use representative demo metrics while their forms are connected to the same data model. Stripe checkout and automated feeds remain the next integration layer.
 
 ## Planned architecture
 
@@ -58,7 +58,7 @@ npm run lint
 npm run build
 ```
 
-Open [http://localhost:3000/player/demo](http://localhost:3000/player/demo) to run the TV player. Use the arrow keys to change slides, Space to pause, and F for full screen.
+Open [http://localhost:3000/player/demo-new-bern](http://localhost:3000/player/demo-new-bern) to run the seeded TV player after connecting the database.
 
 ## Environment setup
 
@@ -67,7 +67,7 @@ Copy `.env.example` to `.env.local` once the integrations are provisioned. Never
 After the Vercel Marketplace Neon integration supplies `DATABASE_URL`, initialize the database with:
 
 ```bash
-npm run db:push
+npm run db:migrate
 ```
 
 ## Delivery sequence
@@ -75,7 +75,7 @@ npm run db:push
 1. Interface foundation and workflow prototype — complete
 2. Clerk authentication and protected portal access — complete
 3. Full-screen web player and reusable content templates — complete foundation
-4. Neon persistence, media uploads, organizations, and role assignments
+4. Neon core persistence and live player telemetry — complete foundation
 5. Stripe checkout and advertiser billing status
 6. Player assignments, offline caching, and screen heartbeat monitoring
 7. Weather, tides, community-event, and local-news feeds

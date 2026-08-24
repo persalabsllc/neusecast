@@ -1,5 +1,7 @@
+import Link from "next/link";
 import {
   CircleAlert,
+  ExternalLink,
   MapPin,
   Monitor,
   MoreHorizontal,
@@ -30,6 +32,9 @@ export default function ScreensPage() {
           </p>
         </div>
         <div className="page-actions">
+          <Link className="button button-secondary" href="/player/demo-new-bern" target="_blank">
+            <ExternalLink size={16} aria-hidden="true" /> Open test player
+          </Link>
           <button className="button button-secondary" type="button">
             <RefreshCw size={16} aria-hidden="true" /> Refresh status
           </button>
