@@ -6,16 +6,19 @@ NeuseCast is the operating platform for an Eastern North Carolina digital screen
 
 ## Current milestone
 
-This repository contains the first production-shaped interface foundation:
+This repository now contains the first production-shaped application foundation:
 
 - a network Control Room dashboard
 - screen-fleet monitoring
 - content review and approval views
 - campaign and playlist management views
 - a local-host portal with graphical content previews
-- realistic demo data so the workflow can be evaluated before external services are connected
+- Clerk sign-in and protected host/control routes
+- a database-driven rotating player at `/player/demo-new-bern`
+- a Neon/Drizzle schema for accounts, venues, screens, content, campaigns, playlists, billing references, and proof-of-play
+- realistic demo content so the complete on-screen experience can be evaluated before live feeds are connected
 
-The current milestone intentionally uses in-app demo data. Authentication, persistence, screen distribution, billing, and automated feeds are the next integration layer.
+The live player now reads its assigned rotation from Neon, refreshes its manifest automatically, sends a heartbeat, and records proof-of-play events. The control dashboards still use representative demo metrics while their forms are connected to the same data model. Stripe checkout and automated feeds remain the next integration layer.
 
 ## Planned architecture
 
@@ -25,7 +28,7 @@ The current milestone intentionally uses in-app demo data. Authentication, persi
 | Accounts and organizations | Clerk |
 | Relational data | Neon Postgres |
 | Images and creative files | Vercel Blob |
-| Screen playback | Yodeck API initially |
+| Screen playback | NeuseCast web player, with optional Yodeck device management |
 | Scheduled feed refreshes | Vercel Cron |
 | AI-assisted card generation | Structured model output with reviewed templates |
 | Source and deployment | GitHub → Vercel |
@@ -55,22 +58,31 @@ npm run lint
 npm run build
 ```
 
+Open [http://localhost:3000/player/demo-new-bern](http://localhost:3000/player/demo-new-bern) to run the seeded TV player after connecting the database.
+
 ## Environment setup
 
 Copy `.env.example` to `.env.local` once the integrations are provisioned. Never commit live credentials.
 
+After the Vercel Marketplace Neon integration supplies `DATABASE_URL`, initialize the database with:
+
+```bash
+npm run db:migrate
+```
+
 ## Delivery sequence
 
-1. Interface foundation and workflow prototype
-2. Clerk organizations and role-based access
-3. Neon data model, media uploads, and audit history
-4. Yodeck playlist publishing and screen heartbeat monitoring
-5. Weather, tides, community-event, and local-news feeds
-6. Content automation with approval rules and advertiser reporting
+1. Interface foundation and workflow prototype — complete
+2. Clerk authentication and protected portal access — complete
+3. Full-screen web player and reusable content templates — complete foundation
+4. Neon core persistence and live player telemetry — complete foundation
+5. Stripe checkout and advertiser billing status
+6. Player assignments, offline caching, and screen heartbeat monitoring
+7. Weather, tides, community-event, and local-news feeds
+8. Content automation with approval rules and advertiser reporting
 
 ## Brand
 
 - **Name:** NeuseCast
 - **Descriptor:** Eastern Carolina's Local Screen Network
 - **Tagline:** Local businesses. Local stories. On screen.
-

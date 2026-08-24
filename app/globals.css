@@ -4446,3 +4446,8 @@ textarea:focus-visible {
     font-size: clamp(48px, 12vw, 120px);
   }
 }
+
+.now-running-player-link {
+  width: 100%;
+  margin-top: 19px;
+}
