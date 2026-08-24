@@ -10,6 +10,15 @@ export const FILLER_CATEGORIES = [
 
 export type FillerCategory = (typeof FILLER_CATEGORIES)[number];
 
+export const AUTOMATIC_FILLER_CATEGORIES = [
+  "did_you_know",
+  "history",
+  "news",
+  "event",
+  "fact",
+  "on_this_day",
+] as const satisfies readonly FillerCategory[];
+
 export const FILLER_CATEGORY_LABELS: Record<FillerCategory, string> = {
   did_you_know: "Did you know?",
   history: "Local history",

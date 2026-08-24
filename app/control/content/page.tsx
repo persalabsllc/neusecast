@@ -34,6 +34,7 @@ import {
   venues,
 } from "@/lib/db/schema";
 import {
+  AUTOMATIC_FILLER_CATEGORIES,
   FILLER_CATEGORIES,
   FILLER_CATEGORY_LABELS,
   FILLER_THEMES,
@@ -254,12 +255,15 @@ export default async function ContentPage({ searchParams }: {
         </details>
 
         <article className="panel filler-automation-panel">
-          <div className="panel-heading"><div><p className="panel-kicker"><Sparkles size={14} /> Automatic filler</p><h2>Research fresh local cards</h2><p>Uses live web sources and rejects unsourced time-sensitive content. Weather refreshes every three hours; the remaining categories refresh each morning.</p></div></div>
+          <div className="panel-heading"><div><p className="panel-kicker"><Sparkles size={14} /> Automatic filler</p><h2>Research fresh local cards</h2><p>Editorial cards use verified live sources and licensed photography. The National Weather Service forecast is managed separately and updates automatically.</p></div></div>
           <form action={generateFillerNow} className="automation-form">
             <label className="field"><span className="field-label">Market</span><input name="market" list="automatic-filler-markets" placeholder="Blank = all active markets" /><datalist id="automatic-filler-markets">{markets.map((market) => <option value={market} key={market} />)}</datalist></label>
             <GenerateFillerButton />
           </form>
-          <div className="automation-categories">{FILLER_CATEGORIES.map((category) => <span key={category}><Check size={12} /> {FILLER_CATEGORY_LABELS[category]}</span>)}</div>
+          <div className="automation-categories">
+            {AUTOMATIC_FILLER_CATEGORIES.map((category) => <span key={category}><Check size={12} /> {FILLER_CATEGORY_LABELS[category]}</span>)}
+            <span><CloudSun size={12} /> Weather · Live NWS</span>
+          </div>
         </article>
       </section>
 

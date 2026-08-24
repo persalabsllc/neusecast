@@ -5,6 +5,7 @@ import { eq, inArray } from "drizzle-orm";
 import { getDatabase } from "@/lib/db";
 import { generatedContent, screens, venues } from "@/lib/db/schema";
 import {
+  AUTOMATIC_FILLER_CATEGORIES,
   FILLER_CATEGORIES,
   FILLER_THEMES,
   type FillerCategory,
@@ -484,7 +485,7 @@ export async function activeFillerMarkets() {
 
 export async function generateAutomaticFiller(
   markets?: string[],
-  categories: readonly FillerCategory[] = FILLER_CATEGORIES,
+  categories: readonly FillerCategory[] = AUTOMATIC_FILLER_CATEGORIES,
 ): Promise<FillerGenerationResult> {
   const requestedMarkets = (markets?.length ? markets : await activeFillerMarkets())
     .map((market) => market.trim().slice(0, 100))
