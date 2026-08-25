@@ -15,6 +15,13 @@ export type PlayerWeatherPeriod = {
   endsAt: string;
 };
 
+export type PlayerWeatherLocation = {
+  name: string;
+  temperature: number | null;
+  temperatureUnit: "F" | "C";
+  observedAt: string | null;
+};
+
 export type PlayerAlert = {
   id: string;
   event: string;
@@ -43,6 +50,7 @@ export type PlayerItem = {
   visualTemplate?: string | null;
   locationLabel?: string | null;
   weatherPeriods?: PlayerWeatherPeriod[];
+  weatherLocations?: PlayerWeatherLocation[];
   expiresAt?: string | null;
 };
 

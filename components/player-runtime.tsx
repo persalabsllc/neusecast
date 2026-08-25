@@ -101,6 +101,11 @@ function WeatherBroadcast({ item, location }: { item: PlayerItem; location: stri
   const temperature = currentPeriod
     ? `${currentPeriod.temperature}°`
     : extractTemperature(forecast);
+  const locationTemperatures = new Map((item.weatherLocations ?? []).map((weatherLocation) => [
+    weatherLocation.name,
+    weatherLocation.temperature === null ? "--" : `${weatherLocation.temperature}°`,
+  ]));
+  const mapTemperature = (name: string, fallback = "--") => locationTemperatures.get(name) ?? fallback;
   const tickerText = periods.length
     ? periods.map((period) => (
       `${period.name}: ${period.temperature}° · ${period.shortForecast}${period.precipitationChance === null ? "" : ` · ${period.precipitationChance}% rain`}`
@@ -151,12 +156,12 @@ function WeatherBroadcast({ item, location }: { item: PlayerItem; location: stri
               <path d="M-90 405C100 347 192 262 325 229S575 153 910 112" />
             </g>
             <g className="player-weather-map-cities">
-              <circle cx="245" cy="98" r="7" /><text x="261" y="104">Greenville</text>
-              <circle cx="410" cy="118" r="7" /><text x="426" y="124">Washington</text>
-              <circle cx="191" cy="216" r="7" /><text x="207" y="222">Kinston</text>
-              <circle className="is-primary" cx="428" cy="235" r="10" /><text className="is-primary" x="448" y="242">New Bern · {temperature ?? "--"}</text>
-              <circle cx="240" cy="337" r="7" /><text x="256" y="343">Jacksonville</text>
-              <circle cx="555" cy="344" r="7" /><text x="571" y="350">Morehead City</text>
+              <circle cx="245" cy="98" r="7" /><text x="261" y="104">Greenville · {mapTemperature("Greenville")}</text>
+              <circle cx="410" cy="118" r="7" /><text x="426" y="124">Washington · {mapTemperature("Washington")}</text>
+              <circle cx="191" cy="216" r="7" /><text x="207" y="222">Kinston · {mapTemperature("Kinston")}</text>
+              <circle className="is-primary" cx="428" cy="235" r="10" /><text className="is-primary" x="448" y="242">New Bern · {mapTemperature("New Bern", temperature ?? "--")}</text>
+              <circle cx="240" cy="337" r="7" /><text x="256" y="343">Jacksonville · {mapTemperature("Jacksonville")}</text>
+              <circle cx="555" cy="344" r="7" /><text x="571" y="350">Morehead City · {mapTemperature("Morehead City")}</text>
             </g>
           </svg>
           <div className="player-weather-map-key"><ForecastIcon forecast={currentForecast} /><span>{currentPeriod?.shortForecast ?? "Regional forecast"}</span></div>

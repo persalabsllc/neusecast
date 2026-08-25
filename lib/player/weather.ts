@@ -2,13 +2,22 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 import { unstable_cache } from "next/cache";
-import type { PlayerAlert, PlayerItem, PlayerWeatherPeriod } from "./types";
+import type { PlayerAlert, PlayerItem, PlayerWeatherLocation, PlayerWeatherPeriod } from "./types";
 
 const REGIONAL_POINT = {
   latitude: 35.1085,
   longitude: -77.0441,
   label: "Eastern North Carolina",
 } as const;
+
+const REGIONAL_WEATHER_STATIONS = [
+  { name: "Greenville", stationId: "KPGV" },
+  { name: "Washington", stationId: "KOCW" },
+  { name: "Kinston", stationId: "KISO" },
+  { name: "New Bern", stationId: "KEWN" },
+  { name: "Jacksonville", stationId: "KOAJ" },
+  { name: "Morehead City", stationId: "KMRH" },
+] as const;
 
 const NWS_HEADERS = {
   Accept: "application/geo+json",
@@ -53,9 +62,20 @@ type NwsAlertsResponse = {
   }>;
 };
 
+type NwsObservationResponse = {
+  properties?: {
+    timestamp?: string;
+    temperature?: {
+      value?: number | null;
+      unitCode?: string;
+    };
+  };
+};
+
 type RegionalForecast = {
   updatedAt: string;
   periods: PlayerWeatherPeriod[];
+  locations: PlayerWeatherLocation[];
 };
 
 function boundedText(value: unknown, max: number) {
@@ -72,7 +92,36 @@ async function nwsJson<T>(url: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+function fahrenheit(value: number, unitCode: string) {
+  return /degc$/iu.test(unitCode) ? (value * 9 / 5) + 32 : value;
+}
+
+async function requestRegionalTemperatures(): Promise<PlayerWeatherLocation[]> {
+  return Promise.all(REGIONAL_WEATHER_STATIONS.map(async (location) => {
+    try {
+      const observation = await nwsJson<NwsObservationResponse>(
+        `https://api.weather.gov/stations/${location.stationId}/observations/latest`,
+      );
+      const rawTemperature = observation.properties?.temperature?.value;
+      const unitCode = boundedText(observation.properties?.temperature?.unitCode, 80);
+      const temperature = typeof rawTemperature === "number" && Number.isFinite(rawTemperature)
+        ? Math.round(fahrenheit(rawTemperature, unitCode))
+        : null;
+      return {
+        name: location.name,
+        temperature,
+        temperatureUnit: "F" as const,
+        observedAt: boundedText(observation.properties?.timestamp, 40) || null,
+      };
+    } catch (error) {
+      console.warn(`NeuseCast could not refresh the ${location.name} NWS observation`, error);
+      return { name: location.name, temperature: null, temperatureUnit: "F" as const, observedAt: null };
+    }
+  }));
+}
+
 async function requestRegionalForecast(): Promise<RegionalForecast> {
+  const regionalTemperaturesPromise = requestRegionalTemperatures();
   const point = await nwsJson<NwsPointsResponse>(
     `https://api.weather.gov/points/${REGIONAL_POINT.latitude},${REGIONAL_POINT.longitude}`,
   );
@@ -80,7 +129,10 @@ async function requestRegionalForecast(): Promise<RegionalForecast> {
   if (!forecastUrl?.startsWith("https://api.weather.gov/")) {
     throw new Error("NWS did not return a valid regional forecast endpoint.");
   }
-  const forecast = await nwsJson<NwsForecastResponse>(forecastUrl);
+  const [forecast, locations] = await Promise.all([
+    nwsJson<NwsForecastResponse>(forecastUrl),
+    regionalTemperaturesPromise,
+  ]);
   const periods = (forecast.properties?.periods ?? []).slice(0, 6).flatMap((period) => {
     const name = boundedText(period.name, 40);
     const shortForecast = boundedText(period.shortForecast, 90);
@@ -107,6 +159,7 @@ async function requestRegionalForecast(): Promise<RegionalForecast> {
   return {
     updatedAt: boundedText(forecast.properties?.updated, 40) || periods[0].startsAt,
     periods,
+    locations,
   };
 }
 
@@ -135,7 +188,7 @@ async function requestRegionalAlerts(): Promise<PlayerAlert[]> {
 
 export const getRegionalForecast = unstable_cache(
   requestRegionalForecast,
-  ["neusecast", "nws", "regional-forecast", "new-bern"],
+  ["neusecast", "nws", "regional-forecast-v2", "eastern-north-carolina"],
   { revalidate: 300 },
 );
 
@@ -149,9 +202,9 @@ export function regionalWeatherItem(forecast: RegionalForecast): PlayerItem {
   const current = forecast.periods[0];
   const next = forecast.periods[1];
   const id = createHash("sha256")
-    .update(forecast.periods.map((period) => (
+    .update(`${forecast.locations.map((location) => `${location.name}:${location.temperature}`).join("|")}::${forecast.periods.map((period) => (
       `${period.startsAt}:${period.name}:${period.temperature}:${period.shortForecast}:${period.precipitationChance}`
-    )).join("|"))
+    )).join("|")}`)
     .digest("hex")
     .slice(0, 24);
   const wind = [current.windDirection, current.windSpeed].filter(Boolean).join(" ");
@@ -178,6 +231,7 @@ export function regionalWeatherItem(forecast: RegionalForecast): PlayerItem {
     contentCategory: "weather",
     mediaCredit: null,
     weatherPeriods: forecast.periods,
+    weatherLocations: forecast.locations,
     expiresAt: current.endsAt,
   };
 }
