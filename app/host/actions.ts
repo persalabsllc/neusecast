@@ -9,6 +9,7 @@ import { ensureScreenManagementSchema } from "@/lib/db/ensure-screen-management"
 import { appUsers, hostContent, screenAdvertiserBlocks, screens, venues } from "@/lib/db/schema";
 import { verifiedPrimaryEmail } from "@/lib/auth-email";
 import { localDateTimeInputInZone } from "@/lib/time-zone";
+import { reconcileVerifiedAppUser } from "@/lib/app-user-identity";
 
 function value(formData: FormData, key: string, max = 200) {
   const raw = formData.get(key);
@@ -22,6 +23,11 @@ export async function requireHostUser() {
   await ensureScreenManagementSchema();
   const database = getDatabase();
   const claimEmail = `claiming.${user.id}@neusecast.invalid`;
+  await reconcileVerifiedAppUser({
+    clerkUserId: user.id,
+    email,
+    displayName: user.fullName ?? email,
+  });
   const [[actual], [invitation], [emailOwner]] = await Promise.all([
     database
       .select({ id: appUsers.clerkUserId, role: appUsers.role, status: appUsers.status })
