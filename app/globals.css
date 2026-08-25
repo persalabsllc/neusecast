@@ -5360,6 +5360,53 @@ a.contact-card:hover { border-color: rgba(67, 221, 193, 0.35); background: rgba(
 }
 
 /* NeuseCast browser player */
+.player-viewport {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  display: grid;
+  width: 100vw;
+  height: 100svh;
+  place-items: center;
+  overflow: hidden;
+  background: #02090c;
+}
+
+.player-viewport-embedded {
+  position: relative;
+  inset: auto;
+  width: 100%;
+  height: 100%;
+}
+
+.player-viewport .player-stage {
+  width: min(100%, calc(100svh * 16 / 9));
+  height: auto;
+  min-height: 0;
+  max-height: 100%;
+  aspect-ratio: 16 / 9;
+  flex: none;
+}
+
+.player-viewport-embedded:not(:fullscreen) .player-stage {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+}
+
+.player-viewport:fullscreen {
+  width: 100vw;
+  height: 100dvh;
+  background: #02090c;
+}
+
+.player-viewport:fullscreen .player-stage {
+  width: min(100%, calc(100dvh * 16 / 9));
+  height: auto;
+  max-height: 100%;
+  aspect-ratio: 16 / 9;
+}
+
 .player-stage,
 .player-empty {
   min-height: 100svh;
@@ -5423,6 +5470,8 @@ a.contact-card:hover { border-color: rgba(67, 221, 193, 0.35); background: rgba(
     radial-gradient(circle at 50% 45%, rgba(var(--player-accent-rgb), 0.2), transparent 38%),
     linear-gradient(135deg, #031014, #0a2a31 58%, #04151a);
 }
+
+.player-viewport .player-stage.player-kind-ident { min-height: 0; }
 
 .player-stage.player-kind-ident.player-embedded { min-height: 0; }
 .player-stage.player-kind-ident.player-has-alert { grid-template-rows: 1fr auto; }

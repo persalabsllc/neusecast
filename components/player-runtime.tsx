@@ -573,7 +573,7 @@ export function PlayerRuntime({
   const flushingPlayback = useRef(false);
   const refreshingManifest = useRef(false);
   const recentEvergreenPlaysRef = useRef(new Map<string, number>());
-  const stageRef = useRef<HTMLElement | null>(null);
+  const stageRef = useRef<HTMLDivElement | null>(null);
   const playableItems = useMemo(() => manifest.items.filter((item) => {
     if (
       !preview
@@ -1043,11 +1043,11 @@ export function PlayerRuntime({
   } as CSSProperties;
 
   return (
-    <main
-      ref={stageRef}
-      className={`player-stage player-theme-${currentItem.theme} player-kind-${currentItem.kind} player-template-${visualTemplate}${hasMedia ? " player-has-media" : ""}${isEditorialPhoto ? " player-editorial-photo" : ""}${activeAlerts.length ? " player-has-alert" : ""}${embedded ? " player-embedded" : ""}`}
-      style={playerStyle}
-    >
+    <div ref={stageRef} className={`player-viewport${embedded ? " player-viewport-embedded" : ""}`}>
+      <main
+        className={`player-stage player-theme-${currentItem.theme} player-kind-${currentItem.kind} player-template-${visualTemplate}${hasMedia ? " player-has-media" : ""}${isEditorialPhoto ? " player-editorial-photo" : ""}${activeAlerts.length ? " player-has-alert" : ""}${embedded ? " player-embedded" : ""}`}
+        style={playerStyle}
+      >
       <div className="player-orbit player-orbit-one" aria-hidden="true" />
       <div className="player-orbit player-orbit-two" aria-hidden="true" />
 
@@ -1140,6 +1140,7 @@ export function PlayerRuntime({
       <div className="player-progress" aria-hidden="true">
         <PlayerProgress key={`${manifest.version}:${displayedIndex}:${currentItem.id}`} durationSeconds={currentItem.durationSeconds} />
       </div>
-    </main>
+      </main>
+    </div>
   );
 }
