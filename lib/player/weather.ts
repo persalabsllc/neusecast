@@ -11,13 +11,14 @@ const REGIONAL_POINT = {
 } as const;
 
 const REGIONAL_WEATHER_STATIONS = [
-  { name: "Greenville", stationId: "KPGV" },
-  { name: "Washington", stationId: "KOCW" },
-  { name: "Kinston", stationId: "KISO" },
-  { name: "New Bern", stationId: "KEWN" },
-  { name: "Jacksonville", stationId: "KOAJ" },
-  { name: "Morehead City", stationId: "KMRH" },
+  { name: "Greenville", stationIds: ["KPGV"] },
+  { name: "Washington", stationIds: ["KOCW", "KPGV"] },
+  { name: "Kinston", stationIds: ["KISO", "KPGV"] },
+  { name: "New Bern", stationIds: ["KEWN", "KNKT"] },
+  { name: "Jacksonville", stationIds: ["KOAJ", "KNCA"] },
+  { name: "Morehead City", stationIds: ["KMRH", "KNKT"] },
 ] as const;
+const MAX_OBSERVATION_AGE_MS = 2 * 60 * 60 * 1_000;
 
 const NWS_HEADERS = {
   Accept: "application/geo+json",
@@ -98,25 +99,32 @@ function fahrenheit(value: number, unitCode: string) {
 
 async function requestRegionalTemperatures(): Promise<PlayerWeatherLocation[]> {
   return Promise.all(REGIONAL_WEATHER_STATIONS.map(async (location) => {
-    try {
-      const observation = await nwsJson<NwsObservationResponse>(
-        `https://api.weather.gov/stations/${location.stationId}/observations/latest`,
-      );
-      const rawTemperature = observation.properties?.temperature?.value;
-      const unitCode = boundedText(observation.properties?.temperature?.unitCode, 80);
-      const temperature = typeof rawTemperature === "number" && Number.isFinite(rawTemperature)
-        ? Math.round(fahrenheit(rawTemperature, unitCode))
-        : null;
-      return {
-        name: location.name,
-        temperature,
-        temperatureUnit: "F" as const,
-        observedAt: boundedText(observation.properties?.timestamp, 40) || null,
-      };
-    } catch (error) {
-      console.warn(`NeuseCast could not refresh the ${location.name} NWS observation`, error);
-      return { name: location.name, temperature: null, temperatureUnit: "F" as const, observedAt: null };
+    for (const stationId of location.stationIds) {
+      try {
+        const observation = await nwsJson<NwsObservationResponse>(
+          `https://api.weather.gov/stations/${stationId}/observations/latest`,
+        );
+        const observedAt = boundedText(observation.properties?.timestamp, 40);
+        const observedAtMs = Date.parse(observedAt);
+        const rawTemperature = observation.properties?.temperature?.value;
+        const unitCode = boundedText(observation.properties?.temperature?.unitCode, 80);
+        if (
+          typeof rawTemperature !== "number"
+          || !Number.isFinite(rawTemperature)
+          || !Number.isFinite(observedAtMs)
+          || Date.now() - observedAtMs > MAX_OBSERVATION_AGE_MS
+        ) continue;
+        return {
+          name: location.name,
+          temperature: Math.round(fahrenheit(rawTemperature, unitCode)),
+          temperatureUnit: "F" as const,
+          observedAt,
+        };
+      } catch (error) {
+        console.warn(`NeuseCast could not refresh NWS station ${stationId} for ${location.name}`, error);
+      }
     }
+    return { name: location.name, temperature: null, temperatureUnit: "F" as const, observedAt: null };
   }));
 }
 
@@ -188,7 +196,7 @@ async function requestRegionalAlerts(): Promise<PlayerAlert[]> {
 
 export const getRegionalForecast = unstable_cache(
   requestRegionalForecast,
-  ["neusecast", "nws", "regional-forecast-v2", "eastern-north-carolina"],
+  ["neusecast", "nws", "regional-forecast-v3", "eastern-north-carolina"],
   { revalidate: 300 },
 );
 
