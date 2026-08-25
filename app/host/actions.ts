@@ -122,6 +122,108 @@ export async function submitHostContent(formData: FormData) {
   redirect("/host?saved=1");
 }
 
+async function ownedHostContent(clerkUserId: string, contentId: string) {
+  return getDatabase()
+    .select({
+      id: hostContent.id,
+      screenId: hostContent.screenId,
+      status: hostContent.status,
+      startsAt: hostContent.startsAt,
+      endsAt: hostContent.endsAt,
+    })
+    .from(hostContent)
+    .innerJoin(venues, eq(hostContent.venueId, venues.id))
+    .where(and(eq(hostContent.id, contentId), eq(venues.hostClerkUserId, clerkUserId)))
+    .limit(1);
+}
+
+export async function updateHostContent(formData: FormData) {
+  const user = await requireHostUser();
+  const contentId = value(formData, "contentId", 36);
+  const screenId = value(formData, "screenId", 36);
+  const template = value(formData, "template", 60) || "special";
+  const headline = value(formData, "headline", 120);
+  const body = value(formData, "body", 500);
+  const callToAction = value(formData, "callToAction", 120);
+  const startsAtRaw = value(formData, "startsAt", 40);
+  const endsAtRaw = value(formData, "endsAt", 40);
+  if (!contentId || !screenId || !headline || !body) redirect("/host?contentError=content");
+
+  const database = getDatabase();
+  const [[ownedContent], [ownedScreen]] = await Promise.all([
+    ownedHostContent(user.id, contentId),
+    database
+      .select({ venueId: venues.id, timeZone: venues.timeZone })
+      .from(screens)
+      .innerJoin(venues, eq(screens.venueId, venues.id))
+      .where(and(eq(screens.id, screenId), eq(venues.hostClerkUserId, user.id), eq(screens.active, true)))
+      .limit(1),
+  ]);
+  if (!ownedContent || !ownedScreen) throw new Error("This content is not assigned to your host account.");
+  if (ownedContent.status === "rejected") redirect("/host?contentError=unavailable");
+
+  const startsAt = startsAtRaw ? localDateTimeInputInZone(startsAtRaw, ownedScreen.timeZone) : new Date();
+  const endsAt = endsAtRaw ? localDateTimeInputInZone(endsAtRaw, ownedScreen.timeZone) : null;
+  if (!startsAt || (endsAtRaw && !endsAt) || (endsAt && endsAt <= startsAt)) redirect("/host?contentError=schedule");
+
+  await database
+    .update(hostContent)
+    .set({
+      venueId: ownedScreen.venueId,
+      screenId,
+      template,
+      headline,
+      body,
+      callToAction: callToAction || null,
+      startsAt,
+      endsAt,
+      status: ownedContent.status === "draft" ? "draft" : "scheduled",
+      updatedAt: new Date(),
+    })
+    .where(eq(hostContent.id, ownedContent.id));
+
+  revalidatePath("/host");
+  revalidatePath("/control/content");
+  revalidatePath(`/control/screens/${screenId}`);
+  if (ownedContent.screenId && ownedContent.screenId !== screenId) revalidatePath(`/control/screens/${ownedContent.screenId}`);
+  redirect("/host?contentUpdated=1");
+}
+
+export async function setHostContentActive(formData: FormData) {
+  const user = await requireHostUser();
+  const contentId = value(formData, "contentId", 36);
+  const active = value(formData, "active", 5) === "true";
+  const [ownedContent] = await ownedHostContent(user.id, contentId);
+  if (!ownedContent) throw new Error("This content is not assigned to your host account.");
+  if (active && ownedContent.status === "rejected") redirect("/host?contentError=unavailable");
+
+  const now = new Date();
+  const startsAt = active && (!ownedContent.startsAt || ownedContent.startsAt <= now) ? now : ownedContent.startsAt;
+  const endsAt = active && ownedContent.endsAt && startsAt && ownedContent.endsAt <= startsAt ? null : ownedContent.endsAt;
+  await getDatabase()
+    .update(hostContent)
+    .set({ status: active ? "scheduled" : "draft", startsAt, endsAt, updatedAt: now })
+    .where(eq(hostContent.id, ownedContent.id));
+
+  revalidatePath("/host");
+  revalidatePath("/control/content");
+  if (ownedContent.screenId) revalidatePath(`/control/screens/${ownedContent.screenId}`);
+  redirect(`/host?contentStatus=${active ? "active" : "paused"}`);
+}
+
+export async function deleteHostContent(formData: FormData) {
+  const user = await requireHostUser();
+  const contentId = value(formData, "contentId", 36);
+  const [ownedContent] = await ownedHostContent(user.id, contentId);
+  if (!ownedContent) throw new Error("This content is not assigned to your host account.");
+
+  await getDatabase().delete(hostContent).where(eq(hostContent.id, ownedContent.id));
+  revalidatePath("/host");
+  revalidatePath("/control/content");
+  if (ownedContent.screenId) revalidatePath(`/control/screens/${ownedContent.screenId}`);
+  redirect("/host?contentDeleted=1");
+}
+
 export async function updateHostAdvertiserBlock(formData: FormData) {
   const user = await requireHostUser();
   const screenId = value(formData, "screenId", 36);
