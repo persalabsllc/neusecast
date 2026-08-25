@@ -7619,6 +7619,594 @@ a.contact-card:hover { border-color: rgba(67, 221, 193, 0.35); background: rgba(
   margin-top: 19px;
 }
 
+/* Host prospecting CRM */
+.prospect-page {
+  --prospect-card-background: rgba(6, 18, 22, 0.72);
+}
+
+.prospect-due-badge {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  border: 1px solid rgba(243, 198, 101, 0.24);
+  border-radius: 12px;
+  background: rgba(243, 198, 101, 0.07);
+  color: var(--sun);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.prospect-create-grid,
+.prospect-workspace-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 16px;
+}
+
+.prospect-editor {
+  overflow: hidden;
+}
+
+.prospect-editor > summary {
+  display: grid;
+  min-height: 78px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 13px;
+  padding: 18px 21px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.prospect-editor > summary::-webkit-details-marker,
+.prospect-card > summary::-webkit-details-marker {
+  display: none;
+}
+
+.prospect-editor > summary > svg:first-child {
+  color: var(--tide);
+}
+
+.prospect-editor > summary > span {
+  display: grid;
+  gap: 4px;
+}
+
+.prospect-editor > summary strong {
+  font-size: 14px;
+}
+
+.prospect-editor > summary small,
+.prospect-import-form > p {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.prospect-editor[open] > summary {
+  border-bottom: 1px solid var(--line);
+}
+
+.prospect-editor[open] > summary > svg:last-child,
+.prospect-card[open] .prospect-card-chevron {
+  transform: rotate(180deg);
+}
+
+.prospect-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px;
+  padding: 21px;
+}
+
+.prospect-checkbox {
+  display: flex;
+  min-height: 56px;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+}
+
+.prospect-checkbox input {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  accent-color: var(--tide);
+}
+
+.prospect-checkbox > span {
+  display: grid;
+  gap: 2px;
+}
+
+.prospect-checkbox strong {
+  color: var(--paper-soft);
+  font-size: 11px;
+}
+
+.prospect-checkbox small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.prospect-import-form {
+  display: grid;
+  gap: 14px;
+  padding: 21px;
+}
+
+.prospect-import-form textarea {
+  min-height: 245px;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10px;
+}
+
+.prospect-import-form > p {
+  margin: 0;
+}
+
+.prospect-import-form code {
+  color: var(--tide);
+}
+
+.prospect-pipeline-panel {
+  overflow: hidden;
+}
+
+.prospect-toolbar {
+  align-items: center;
+}
+
+.prospect-filter-form,
+.prospect-filter-form > label,
+.prospect-note-form,
+.prospect-note-form > label,
+.prospect-source-strip,
+.prospect-source-strip > div {
+  display: flex;
+  align-items: center;
+}
+
+.prospect-filter-form {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.prospect-filter-form > label,
+.prospect-note-form > label {
+  min-height: 38px;
+  gap: 8px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(4, 14, 18, 0.58);
+  color: var(--muted);
+}
+
+.prospect-filter-form input,
+.prospect-note-form input {
+  min-width: 190px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--paper);
+}
+
+.prospect-filter-form select {
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #08171b;
+  color: var(--paper-soft);
+}
+
+.prospect-list {
+  display: grid;
+}
+
+.prospect-card {
+  border-bottom: 1px solid var(--line);
+  background: var(--prospect-card-background);
+}
+
+.prospect-card:last-child {
+  border-bottom: 0;
+}
+
+.prospect-card.priority-high {
+  box-shadow: inset 3px 0 rgba(255, 127, 107, 0.72);
+}
+
+.prospect-card.priority-medium {
+  box-shadow: inset 3px 0 rgba(243, 198, 101, 0.55);
+}
+
+.prospect-card.priority-low {
+  box-shadow: inset 3px 0 rgba(110, 175, 232, 0.38);
+}
+
+.prospect-card > summary {
+  display: grid;
+  min-height: 88px;
+  grid-template-columns: minmax(190px, 1.05fr) minmax(230px, 1.5fr) minmax(175px, 1fr) minmax(180px, 1.05fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 15px 20px 15px 23px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.prospect-card > summary:hover {
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.prospect-summary-main,
+.prospect-summary-contact,
+.prospect-summary-next {
+  display: grid;
+  min-width: 0;
+  justify-items: start;
+  gap: 4px;
+}
+
+.prospect-summary-main > strong {
+  color: var(--paper);
+  font-size: 13px;
+}
+
+.prospect-summary-main small,
+.prospect-summary-contact small,
+.prospect-summary-next small {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+}
+
+.prospect-summary-fit {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--muted-bright);
+  font-size: 11px;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.prospect-summary-contact > strong,
+.prospect-summary-next > strong {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--paper-soft);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prospect-summary-contact em {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--tide);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 650;
+}
+
+.prospect-card-chevron {
+  color: var(--muted);
+  transition: transform 160ms ease;
+}
+
+.prospect-card-body {
+  display: grid;
+  gap: 18px;
+  padding: 0 23px 23px;
+}
+
+.prospect-source-strip {
+  justify-content: space-between;
+  gap: 14px;
+  padding: 13px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.prospect-source-strip strong {
+  color: var(--paper-soft);
+}
+
+.prospect-source-strip > div {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.prospect-source-strip a {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--tide);
+}
+
+.prospect-update-form,
+.prospect-outreach-card {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 19px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.prospect-update-form .form-heading,
+.prospect-outreach-card .form-heading,
+.prospect-outreach-card .prospect-email-form,
+.prospect-outreach-card .prospect-queue-state {
+  grid-column: 1 / -1;
+}
+
+.prospect-update-form .form-heading h2,
+.prospect-outreach-card .form-heading h2 {
+  font-size: 18px;
+}
+
+.prospect-email-form {
+  display: grid;
+  gap: 13px;
+}
+
+.prospect-email-form textarea {
+  min-height: 300px;
+}
+
+.prospect-email-form > small {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.prospect-queue-state {
+  display: grid;
+  min-height: 235px;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+  padding: 24px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 13px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.prospect-queue-state strong {
+  color: var(--paper-soft);
+  font-size: 12px;
+}
+
+.prospect-queue-state span {
+  max-width: 360px;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.prospect-queue-review {
+  min-height: 0;
+  place-content: initial;
+  justify-items: stretch;
+  text-align: left;
+}
+
+.prospect-queue-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.prospect-queue-heading > div {
+  display: grid;
+  gap: 3px;
+}
+
+.prospect-queue-review span {
+  max-width: none;
+}
+
+.prospect-queue-review textarea {
+  min-height: 280px;
+}
+
+.prospect-queue-review > form {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.prospect-activity-section {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.55fr) minmax(320px, 1.25fr);
+  gap: 15px 20px;
+  padding-top: 3px;
+}
+
+.prospect-activity-section h3 {
+  margin: 5px 0 0;
+  font-size: 14px;
+}
+
+.prospect-note-form {
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.prospect-note-form > label {
+  flex: 1;
+}
+
+.prospect-note-form input {
+  width: 100%;
+}
+
+.prospect-activity-list {
+  display: grid;
+  grid-column: 1 / -1;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  overflow: hidden;
+}
+
+.prospect-activity-list article {
+  display: grid;
+  grid-template-columns: minmax(115px, 0.35fr) minmax(0, 1.5fr) auto;
+  align-items: center;
+  gap: 13px;
+  padding: 11px 13px;
+  border-bottom: 1px solid var(--line);
+}
+
+.prospect-activity-list article:last-child {
+  border-bottom: 0;
+}
+
+.prospect-activity-list strong {
+  overflow: hidden;
+  color: var(--paper-soft);
+  font-size: 10px;
+  font-weight: 540;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prospect-activity-list small,
+.prospect-activity-list > p {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.prospect-activity-list > p {
+  margin: 0;
+  padding: 14px;
+}
+
+.status-researching { color: var(--sky); }
+.status-ready,
+.status-replied,
+.status-committed,
+.status-converted,
+.status-received,
+.status-completed,
+.status-sent { color: var(--tide); }
+.status-queued,
+.status-contacted,
+.status-follow_up,
+.status-meeting { color: var(--sun); }
+.status-not_interested,
+.status-do_not_contact,
+.status-cancelled,
+.status-failed,
+.status-bounced { color: var(--danger); }
+
+@media (max-width: 1180px) {
+  .prospect-card > summary {
+    grid-template-columns: minmax(180px, 1fr) minmax(220px, 1.4fr) minmax(170px, 1fr) auto;
+  }
+
+  .prospect-summary-next {
+    grid-column: 2 / 4;
+  }
+
+  .prospect-card-chevron {
+    grid-column: 4;
+    grid-row: 1 / 3;
+  }
+}
+
+@media (max-width: 900px) {
+  .prospect-create-grid,
+  .prospect-workspace-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .prospect-toolbar,
+  .prospect-source-strip,
+  .prospect-activity-section {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  .prospect-filter-form,
+  .prospect-source-strip > div,
+  .prospect-note-form {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 720px) {
+  .prospect-form,
+  .prospect-update-form,
+  .prospect-outreach-card {
+    grid-template-columns: 1fr;
+  }
+
+  .prospect-form .field-wide,
+  .prospect-update-form .field-wide,
+  .prospect-update-form .form-heading,
+  .prospect-outreach-card .form-heading,
+  .prospect-outreach-card .prospect-email-form,
+  .prospect-outreach-card .prospect-queue-state {
+    grid-column: auto;
+  }
+
+  .prospect-card > summary {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 11px;
+  }
+
+  .prospect-summary-fit,
+  .prospect-summary-contact,
+  .prospect-summary-next {
+    grid-column: 1;
+  }
+
+  .prospect-card-chevron {
+    grid-column: 2;
+    grid-row: 1 / 5;
+  }
+
+  .prospect-filter-form,
+  .prospect-filter-form > label,
+  .prospect-filter-form input,
+  .prospect-filter-form select,
+  .prospect-filter-form .button,
+  .prospect-note-form,
+  .prospect-note-form > label,
+  .prospect-note-form .button {
+    width: 100%;
+  }
+
+  .prospect-activity-list article {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Billing outcomes */
 .billing-result-page {
   display: grid;
