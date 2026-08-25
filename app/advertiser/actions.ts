@@ -7,8 +7,8 @@ import { redirect } from "next/navigation";
 import { createCampaignCheckout, hasActiveAdvertiserSubscription, requiresAdvertiserBillingAction } from "@/lib/billing";
 import { verifiedPrimaryEmail } from "@/lib/auth-email";
 import { getDatabase } from "@/lib/db";
-import { advertiserAccounts, appUsers, campaignOrders, campaignScreens, campaigns, creatives, screens } from "@/lib/db/schema";
-import { NEUSECAST_PLAN } from "@/lib/pricing";
+import { advertiserAccounts, advertiserRadioBriefs, appUsers, campaignOrders, campaignScreens, campaigns, creatives, screens } from "@/lib/db/schema";
+import { DEFAULT_MEDIA_PLAN_KEY, getMediaPlan, isMediaPlanKey, mediaPlanOrDefault, planIncludesRadio } from "@/lib/pricing";
 import { getApplicationUrl, getStripe } from "@/lib/stripe";
 import { nextBroadcastMorning } from "@/lib/time-zone";
 import { ADVERTISING_TERMS_VERSION } from "@/lib/legal";
@@ -60,9 +60,11 @@ export async function createAdvertiserAccount(formData: FormData) {
   const billingEmail = textValue(formData, "billingEmail", 320).toLowerCase();
   const phone = textValue(formData, "phone", 40);
   const website = textValue(formData, "website", 500);
+  const requestedPlanKey = textValue(formData, "planKey", 40);
+  const planKey = isMediaPlanKey(requestedPlanKey) ? requestedPlanKey : DEFAULT_MEDIA_PLAN_KEY;
 
   if (!businessName || !billingEmail || !billingEmail.includes("@")) {
-    redirect("/advertiser?error=business-details");
+    redirect(`/advertiser?error=business-details&plan=${planKey}`);
   }
 
   const database = getDatabase();
@@ -88,7 +90,7 @@ export async function createAdvertiserAccount(formData: FormData) {
 
   if (!existingUser) {
     if (emailOwner && emailOwner.status !== "invited") {
-      redirect("/advertiser?error=account-conflict");
+      redirect(`/advertiser?error=account-conflict&plan=${planKey}`);
     }
 
     // A host invitation may already reserve this verified email. Move the
@@ -130,7 +132,7 @@ export async function createAdvertiserAccount(formData: FormData) {
       },
     });
 
-  redirect("/advertiser?welcome=1");
+  redirect(`/advertiser/new?plan=${planKey}`);
 }
 
 export async function createCampaignAndCheckout(formData: FormData) {
@@ -142,6 +144,7 @@ export async function createCampaignAndCheckout(formData: FormData) {
       businessName: advertiserAccounts.businessName,
       stripeCustomerId: advertiserAccounts.stripeCustomerId,
       subscriptionStatus: advertiserAccounts.subscriptionStatus,
+      subscriptionPlanKey: advertiserAccounts.subscriptionPlanKey,
     })
     .from(advertiserAccounts)
     .where(
@@ -162,14 +165,34 @@ export async function createCampaignAndCheckout(formData: FormData) {
   const eyebrow = textValue(formData, "eyebrow", 50) || "Local business";
   const theme = textValue(formData, "theme", 20) || "aqua";
 
-  if (!UUID_PATTERN.test(submissionId) || !name || !headline || !body || !callToAction) {
-    redirect("/advertiser/new?error=campaign-details");
-  }
-
   const hasActiveSubscription = hasActiveAdvertiserSubscription(account.subscriptionStatus);
+  const requestedPlanKey = textValue(formData, "planKey", 40);
+  const requestedPlan = getMediaPlan(requestedPlanKey || DEFAULT_MEDIA_PLAN_KEY);
+  if (!hasActiveSubscription && !requestedPlan) {
+    redirect(`/advertiser/new?error=plan-invalid&plan=${DEFAULT_MEDIA_PLAN_KEY}`);
+  }
+  const selectedPlan = hasActiveSubscription
+    ? mediaPlanOrDefault(account.subscriptionPlanKey)
+    : requestedPlan!;
+  if (!UUID_PATTERN.test(submissionId) || !name || !headline || !body || !callToAction) {
+    redirect(`/advertiser/new?error=campaign-details&plan=${selectedPlan.key}`);
+  }
+  const radioBrief = {
+    messageFocus: textValue(formData, "radioMessageFocus", 1_000),
+    destination: textValue(formData, "radioDestination", 255),
+    pronunciationNotes: textValue(formData, "radioPronunciationNotes", 1_000),
+    preferredTone: textValue(formData, "radioPreferredTone", 80),
+  };
+  if (
+    !hasActiveSubscription
+    && planIncludesRadio(selectedPlan)
+    && (!radioBrief.messageFocus || !radioBrief.destination)
+  ) {
+    redirect(`/advertiser/new?error=radio-brief&plan=${selectedPlan.key}`);
+  }
   const acceptedTerms = formData.get("acceptTerms") === "on";
   if (!hasActiveSubscription && !acceptedTerms) {
-    redirect("/advertiser/new?error=terms-required");
+    redirect(`/advertiser/new?error=terms-required&plan=${selectedPlan.key}`);
   }
 
   if (requiresAdvertiserBillingAction(account.subscriptionStatus)) {
@@ -177,7 +200,14 @@ export async function createCampaignAndCheckout(formData: FormData) {
   }
 
   const [pendingOrder] = await database
-    .select({ id: campaignOrders.id, campaignId: campaignOrders.campaignId })
+    .select({
+      id: campaignOrders.id,
+      campaignId: campaignOrders.campaignId,
+      planKey: campaignOrders.planKey,
+      amountCents: campaignOrders.amountCents,
+      currency: campaignOrders.currency,
+      stripeCheckoutSessionId: campaignOrders.stripeCheckoutSessionId,
+    })
     .from(campaignOrders)
     .where(and(
       eq(campaignOrders.advertiserAccountId, account.id),
@@ -188,14 +218,26 @@ export async function createCampaignAndCheckout(formData: FormData) {
     .limit(1);
 
   if (!hasActiveAdvertiserSubscription(account.subscriptionStatus) && pendingOrder) {
+    const planChanged = pendingOrder.planKey !== selectedPlan.key
+      || pendingOrder.amountCents !== selectedPlan.amountCents
+      || pendingOrder.currency !== selectedPlan.currency;
+    if (planChanged && pendingOrder.stripeCheckoutSessionId) {
+      const existingSession = await getStripe().checkout.sessions.retrieve(pendingOrder.stripeCheckoutSessionId);
+      if (existingSession.status === "open") {
+        await getStripe().checkout.sessions.expire(existingSession.id);
+      } else if (existingSession.status === "complete") {
+        redirect("/advertiser?error=checkout-processing");
+      }
+    }
+
     const campaignUpdate = database.update(campaigns).set({
       name,
       objective: body,
       status: "payment_pending",
       targeting: { markets: ["Eastern Carolina"], notes: "All active NeuseCast screens" },
-      subtotalCents: NEUSECAST_PLAN.amountCents,
-      totalCents: NEUSECAST_PLAN.amountCents,
-      currency: NEUSECAST_PLAN.currency,
+      subtotalCents: selectedPlan.amountCents,
+      totalCents: selectedPlan.amountCents,
+      currency: selectedPlan.currency,
       updatedAt: new Date(),
     }).where(and(eq(campaigns.id, pendingOrder.campaignId), eq(campaigns.advertiserAccountId, account.id)));
 
@@ -207,10 +249,36 @@ export async function createCampaignAndCheckout(formData: FormData) {
       .limit(1);
 
     const orderUpdate = database.update(campaignOrders).set({
+      planKey: selectedPlan.key,
+      amountCents: selectedPlan.amountCents,
+      currency: selectedPlan.currency,
       termsAcceptedAt: new Date(),
       termsVersion: ADVERTISING_TERMS_VERSION,
       updatedAt: new Date(),
     }).where(eq(campaignOrders.id, pendingOrder.id));
+
+    const radioBriefUpdate = planIncludesRadio(selectedPlan)
+      ? database.insert(advertiserRadioBriefs).values({
+          advertiserAccountId: account.id,
+          campaignId: pendingOrder.campaignId,
+          status: "pending_payment",
+          messageFocus: radioBrief.messageFocus,
+          destination: radioBrief.destination,
+          pronunciationNotes: radioBrief.pronunciationNotes || null,
+          preferredTone: radioBrief.preferredTone || null,
+        }).onConflictDoUpdate({
+          target: advertiserRadioBriefs.advertiserAccountId,
+          set: {
+            campaignId: pendingOrder.campaignId,
+            status: "pending_payment",
+            messageFocus: radioBrief.messageFocus,
+            destination: radioBrief.destination,
+            pronunciationNotes: radioBrief.pronunciationNotes || null,
+            preferredTone: radioBrief.preferredTone || null,
+            updatedAt: new Date(),
+          },
+        })
+      : database.update(advertiserRadioBriefs).set({ status: "retired", updatedAt: new Date() }).where(eq(advertiserRadioBriefs.advertiserAccountId, account.id));
 
     if (draftCreative) {
       const creativeUpdate = database.update(creatives).set({
@@ -221,7 +289,7 @@ export async function createCampaignAndCheckout(formData: FormData) {
         metadata: { eyebrow, theme, sponsor: account.businessName },
         updatedAt: new Date(),
       }).where(eq(creatives.id, draftCreative.id));
-      await database.batch([campaignUpdate, creativeUpdate, orderUpdate] as const);
+      await database.batch([campaignUpdate, creativeUpdate, orderUpdate, radioBriefUpdate] as const);
     } else {
       const creativeInsert = database.insert(creatives).values({
         campaignId: pendingOrder.campaignId,
@@ -234,7 +302,7 @@ export async function createCampaignAndCheckout(formData: FormData) {
         callToAction,
         metadata: { eyebrow, theme, sponsor: account.businessName },
       });
-      await database.batch([campaignUpdate, creativeInsert, orderUpdate] as const);
+      await database.batch([campaignUpdate, creativeInsert, orderUpdate, radioBriefUpdate] as const);
     }
 
     redirect(await createCampaignCheckout(pendingOrder.id, user.id));
@@ -249,9 +317,9 @@ export async function createCampaignAndCheckout(formData: FormData) {
     objective: body,
     status: hasActiveSubscription ? "draft" : "payment_pending",
     targeting: { markets: ["Eastern Carolina"], notes: "All active NeuseCast screens" },
-    subtotalCents: NEUSECAST_PLAN.amountCents,
-    totalCents: NEUSECAST_PLAN.amountCents,
-    currency: NEUSECAST_PLAN.currency,
+    subtotalCents: selectedPlan.amountCents,
+    totalCents: selectedPlan.amountCents,
+    currency: selectedPlan.currency,
   });
 
   const creativeInsert = database.insert(creatives).values({
@@ -270,18 +338,42 @@ export async function createCampaignAndCheckout(formData: FormData) {
     id: orderId,
     campaignId: submissionId,
     advertiserAccountId: account.id,
-    amountCents: NEUSECAST_PLAN.amountCents,
-    currency: NEUSECAST_PLAN.currency,
+    planKey: selectedPlan.key,
+    amountCents: selectedPlan.amountCents,
+    currency: selectedPlan.currency,
     termsAcceptedAt: new Date(),
     termsVersion: ADVERTISING_TERMS_VERSION,
   });
+
+  const radioBriefInsert = planIncludesRadio(selectedPlan)
+    ? database.insert(advertiserRadioBriefs).values({
+        advertiserAccountId: account.id,
+        campaignId: submissionId,
+        status: "pending_payment",
+        messageFocus: radioBrief.messageFocus,
+        destination: radioBrief.destination,
+        pronunciationNotes: radioBrief.pronunciationNotes || null,
+        preferredTone: radioBrief.preferredTone || null,
+      }).onConflictDoUpdate({
+        target: advertiserRadioBriefs.advertiserAccountId,
+        set: {
+          campaignId: submissionId,
+          status: "pending_payment",
+          messageFocus: radioBrief.messageFocus,
+          destination: radioBrief.destination,
+          pronunciationNotes: radioBrief.pronunciationNotes || null,
+          preferredTone: radioBrief.preferredTone || null,
+          updatedAt: new Date(),
+        },
+      })
+    : database.update(advertiserRadioBriefs).set({ status: "retired", updatedAt: new Date() }).where(eq(advertiserRadioBriefs.advertiserAccountId, account.id));
 
   let uniqueConflict: unknown = null;
   try {
     if (hasActiveSubscription) {
       await database.batch([campaignInsert, creativeInsert] as const);
     } else {
-      await database.batch([campaignInsert, creativeInsert, orderInsert] as const);
+      await database.batch([campaignInsert, creativeInsert, orderInsert, radioBriefInsert] as const);
     }
   } catch (error) {
     if (!isUniqueViolation(error)) throw error;
@@ -301,7 +393,7 @@ export async function createCampaignAndCheckout(formData: FormData) {
       }
     } else {
       const [recoveredOrder] = await database
-        .select({ id: campaignOrders.id })
+        .select({ id: campaignOrders.id, campaignId: campaignOrders.campaignId })
         .from(campaignOrders)
         .where(and(
           eq(campaignOrders.advertiserAccountId, account.id),
@@ -311,11 +403,36 @@ export async function createCampaignAndCheckout(formData: FormData) {
         .orderBy(desc(campaignOrders.createdAt))
         .limit(1);
       if (recoveredOrder) {
-        await database.update(campaignOrders).set({
+        const recoveredRadioBrief = planIncludesRadio(selectedPlan)
+          ? database.insert(advertiserRadioBriefs).values({
+              advertiserAccountId: account.id,
+              campaignId: recoveredOrder.campaignId,
+              status: "pending_payment",
+              messageFocus: radioBrief.messageFocus,
+              destination: radioBrief.destination,
+              pronunciationNotes: radioBrief.pronunciationNotes || null,
+              preferredTone: radioBrief.preferredTone || null,
+            }).onConflictDoUpdate({
+              target: advertiserRadioBriefs.advertiserAccountId,
+              set: {
+                campaignId: recoveredOrder.campaignId,
+                status: "pending_payment",
+                messageFocus: radioBrief.messageFocus,
+                destination: radioBrief.destination,
+                pronunciationNotes: radioBrief.pronunciationNotes || null,
+                preferredTone: radioBrief.preferredTone || null,
+                updatedAt: new Date(),
+              },
+            })
+          : database.update(advertiserRadioBriefs).set({ status: "retired", updatedAt: new Date() }).where(eq(advertiserRadioBriefs.advertiserAccountId, account.id));
+        await database.batch([database.update(campaignOrders).set({
+          planKey: selectedPlan.key,
+          amountCents: selectedPlan.amountCents,
+          currency: selectedPlan.currency,
           termsAcceptedAt: new Date(),
           termsVersion: ADVERTISING_TERMS_VERSION,
           updatedAt: new Date(),
-        }).where(eq(campaignOrders.id, recoveredOrder.id));
+        }).where(eq(campaignOrders.id, recoveredOrder.id)), recoveredRadioBrief] as const);
         redirect(await createCampaignCheckout(recoveredOrder.id, user.id));
       }
     }

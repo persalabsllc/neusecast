@@ -1,5 +1,6 @@
 import {
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -37,6 +38,7 @@ export const campaignStatus = pgEnum("campaign_status", [
 export const creativeStatus = pgEnum("creative_status", ["draft", "processing", "review", "approved", "rejected", "archived"]);
 export const creativeType = pgEnum("creative_type", ["image", "video", "generated_slide"]);
 export const orderStatus = pgEnum("order_status", ["pending", "paid", "failed", "refunded", "cancelled"]);
+export const radioBriefStatus = pgEnum("radio_brief_status", ["pending_payment", "submitted", "in_production", "approved", "active", "retired"]);
 export const hostContentStatus = pgEnum("host_content_status", ["draft", "submitted", "approved", "scheduled", "expired", "rejected"]);
 export const newsroomStoryStatus = pgEnum("newsroom_story_status", ["review", "approved", "rejected", "killed"]);
 export const newsroomEditionStatus = pgEnum("newsroom_edition_status", ["draft", "review", "published", "withdrawn", "failed"]);
@@ -102,6 +104,7 @@ export const advertiserAccounts = pgTable(
     stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
     stripeEventCreatedAt: timestamp("stripe_event_created_at", { withTimezone: true }),
     subscriptionStatus: varchar("subscription_status", { length: 32 }).default("inactive").notNull(),
+    subscriptionPlanKey: varchar("subscription_plan_key", { length: 40 }),
     active: boolean("active").default(true).notNull(),
     ...timestamps,
   },
@@ -109,6 +112,7 @@ export const advertiserAccounts = pgTable(
     uniqueIndex("advertiser_owner_idx").on(table.ownerClerkUserId),
     uniqueIndex("advertiser_stripe_customer_idx").on(table.stripeCustomerId),
     uniqueIndex("advertiser_stripe_subscription_idx").on(table.stripeSubscriptionId),
+    check("advertiser_subscription_plan_key_check", sql`${table.subscriptionPlanKey} is null or ${table.subscriptionPlanKey} in ('screens', 'hear_see', 'local_dominance')`),
   ],
 );
 
@@ -387,6 +391,7 @@ export const campaignOrders = pgTable(
     status: orderStatus("status").default("pending").notNull(),
     stripeCheckoutSessionId: varchar("stripe_checkout_session_id", { length: 255 }),
     stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
+    planKey: varchar("plan_key", { length: 40 }).default("screens").notNull(),
     amountCents: integer("amount_cents").notNull(),
     currency: varchar("currency", { length: 3 }).default("USD").notNull(),
     paidAt: timestamp("paid_at", { withTimezone: true }),
@@ -400,6 +405,28 @@ export const campaignOrders = pgTable(
     uniqueIndex("orders_open_advertiser_idx")
       .on(table.advertiserAccountId)
       .where(sql`${table.status} in ('pending', 'failed') and ${table.stripePaymentIntentId} is null`),
+    check("campaign_orders_plan_key_check", sql`${table.planKey} in ('screens', 'hear_see', 'local_dominance')`),
+  ],
+);
+
+export const advertiserRadioBriefs = pgTable(
+  "advertiser_radio_briefs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    advertiserAccountId: uuid("advertiser_account_id")
+      .notNull()
+      .references(() => advertiserAccounts.id, { onDelete: "cascade" }),
+    campaignId: uuid("campaign_id").references(() => campaigns.id, { onDelete: "set null" }),
+    status: radioBriefStatus("status").default("pending_payment").notNull(),
+    messageFocus: text("message_focus").notNull(),
+    destination: varchar("destination", { length: 255 }).notNull(),
+    pronunciationNotes: text("pronunciation_notes"),
+    preferredTone: varchar("preferred_tone", { length: 80 }),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("advertiser_radio_briefs_advertiser_idx").on(table.advertiserAccountId),
+    index("advertiser_radio_briefs_status_idx").on(table.status, table.updatedAt),
   ],
 );
 

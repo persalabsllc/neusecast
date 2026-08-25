@@ -4,8 +4,8 @@ NeuseCast is Persa Labs' end-to-end operating platform for an Eastern North Caro
 
 ## Launch workflow
 
-- Advertisers create an account, enter business details, design and preview a campaign, and subscribe through Stripe for **$75/month**.
-- The plan includes every active NeuseCast screen. Additional campaigns are included while the advertiser's plan remains active.
+- Advertisers create an account, enter business details, design and preview a campaign, choose a monthly reach package, and subscribe through Stripe.
+- Every package includes all active NeuseCast screens. The two radio-and-screen packages also create a Captain 97.1 underwriting-production brief for the Control Room. Additional screen campaigns are included while the advertiser's plan remains active.
 - Paid creative enters the Control Room review queue and is scheduled for the following broadcast day. It cannot air until a NeuseCast administrator approves it.
 - Hosts publish venue-only specials, menus, events, and announcements directly to their own assigned screens.
 - Control Room administrators create venues and permanent player URLs, issue one-time device pairing links, assign host accounts, block venue conflicts, and monitor heartbeats, playlist delivery, device details, and proof-of-play.
@@ -22,7 +22,7 @@ There is no seeded or synthetic launch data. New accounts, venues, screens, camp
 | Web application and APIs | Next.js on Vercel |
 | Authentication | Clerk |
 | Relational data | Neon Postgres with Drizzle ORM |
-| Advertiser subscriptions | Stripe Checkout and webhooks |
+| Advertiser subscriptions | Stripe Checkout and signed webhooks |
 | Creative media | Vercel Blob |
 | Screen playback | Proprietary NeuseCast web player |
 | Source and deployments | GitHub to Vercel |
@@ -69,9 +69,11 @@ Newsroom editions use approved official and local-publisher domains, retain dire
 
 Before taking the first live advertiser payment:
 
-1. In Stripe's live Customer Portal configuration, allow customers to update payment methods and cancel subscriptions. Prefer cancellation at the end of the paid billing period.
+1. In Stripe's live Customer Portal configuration, allow customers to update payment methods and cancel subscriptions. Prefer cancellation at the end of the paid billing period. Keep plan and quantity changes disabled until the application implements `customer.subscription.updated` handling and explicit upgrade/downgrade rules.
 2. Confirm the production webhook destination includes `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `checkout.session.expired`, `customer.subscription.deleted`, `invoice.payment_failed`, and `invoice.paid`.
 3. Confirm `STRIPE_WEBHOOK_SECRET` is the signing secret for that exact live webhook destination and redeploy production after changing it.
+
+Package prices and entitlements live in `lib/pricing.ts`; never accept an amount supplied by the browser. Stripe Checkout is created from the server-authoritative package attached to the pending order, and only the signed webhook grants screen or radio entitlement.
 
 Database migrations run automatically before each Vercel build. Application requests never create, alter, seed, or delete database schema/data.
 
