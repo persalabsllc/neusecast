@@ -3,7 +3,7 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { and, eq, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 import { getDatabase } from "@/lib/db";
 import { ensureScreenManagementSchema } from "@/lib/db/ensure-screen-management";
 import { appUsers, hostContent, screenAdvertiserBlocks, screens, venues } from "@/lib/db/schema";
@@ -22,50 +22,69 @@ export async function requireHostUser() {
   await ensureScreenManagementSchema();
   const database = getDatabase();
   const claimEmail = `claiming.${user.id}@neusecast.invalid`;
-  const [actual] = await database
-    .select({ id: appUsers.clerkUserId, role: appUsers.role, status: appUsers.status })
-    .from(appUsers)
-    .where(eq(appUsers.clerkUserId, user.id))
-    .limit(1);
-  if (actual && (actual.role !== "host" || actual.status !== "active")) notFound();
-
-  const [invitation] = await database
-    .select({ id: appUsers.clerkUserId })
-    .from(appUsers)
-    .where(and(
-      or(eq(appUsers.email, email), eq(appUsers.email, claimEmail)),
-      eq(appUsers.role, "host"),
-      eq(appUsers.status, "invited"),
-    ))
-    .limit(1);
-
-  if (!actual && !invitation) notFound();
-
-  if (!actual) {
-    await database
-      .update(appUsers)
-      .set({ email: claimEmail, updatedAt: new Date() })
-      .where(eq(appUsers.clerkUserId, invitation!.id));
-    await database
-      .insert(appUsers)
-      .values({ clerkUserId: user.id, email, displayName: user.fullName ?? email, role: "host", status: "active" })
-      .onConflictDoNothing();
-    const [claimed] = await database
-      .select({ role: appUsers.role, status: appUsers.status })
+  const [[actual], [invitation], [emailOwner]] = await Promise.all([
+    database
+      .select({ id: appUsers.clerkUserId, role: appUsers.role, status: appUsers.status })
       .from(appUsers)
       .where(eq(appUsers.clerkUserId, user.id))
-      .limit(1);
-    if (!claimed || claimed.role !== "host" || claimed.status !== "active") notFound();
+      .limit(1),
+    database
+      .select({ id: appUsers.clerkUserId })
+      .from(appUsers)
+      .where(and(
+        or(eq(appUsers.email, email), eq(appUsers.email, claimEmail)),
+        eq(appUsers.role, "host"),
+        eq(appUsers.status, "invited"),
+      ))
+      .limit(1),
+    database
+      .select({ id: appUsers.clerkUserId, status: appUsers.status })
+      .from(appUsers)
+      .where(eq(appUsers.email, email))
+      .limit(1),
+  ]);
+  const pendingInvitation = invitation?.id === user.id ? null : invitation;
+
+  if (actual?.status === "suspended") redirect("/access-required?workspace=host");
+  if (!actual && emailOwner && emailOwner.id !== pendingInvitation?.id) {
+    redirect("/access-required?workspace=host");
+  }
+
+  if (!actual) {
+    if (pendingInvitation) {
+      await database
+        .update(appUsers)
+        .set({ email: claimEmail, updatedAt: new Date() })
+        .where(eq(appUsers.clerkUserId, pendingInvitation.id));
+    }
+    await database.insert(appUsers).values({
+      clerkUserId: user.id,
+      email,
+      displayName: user.fullName ?? email,
+      role: "host",
+      status: "active",
+    });
   }
 
   // The deterministic claim email makes this sequence recoverable. If a network
   // error interrupts it, the next sign-in can finish without orphaning the venue.
-  if (invitation) {
+  if (pendingInvitation) {
     await database
       .update(venues)
       .set({ hostClerkUserId: user.id, updatedAt: new Date() })
-      .where(eq(venues.hostClerkUserId, invitation.id));
-    await database.delete(appUsers).where(eq(appUsers.clerkUserId, invitation.id));
+      .where(eq(venues.hostClerkUserId, pendingInvitation.id));
+    await database.delete(appUsers).where(eq(appUsers.clerkUserId, pendingInvitation.id));
+    if (actual && actual.role !== "admin") {
+      await database
+        .update(appUsers)
+        .set({ role: "host", status: "active", updatedAt: new Date() })
+        .where(eq(appUsers.clerkUserId, user.id));
+    }
+  } else if (actual?.status === "invited") {
+    await database
+      .update(appUsers)
+      .set({ status: "active", updatedAt: new Date() })
+      .where(eq(appUsers.clerkUserId, user.id));
   }
   return user;
 }

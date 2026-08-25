@@ -65,15 +65,44 @@ export async function createAdvertiserAccount(formData: FormData) {
   }
 
   const database = getDatabase();
-  await database
-    .insert(appUsers)
-    .values({
+  const [[existingUser], [emailOwner]] = await Promise.all([
+    database
+      .select({ clerkUserId: appUsers.clerkUserId, status: appUsers.status })
+      .from(appUsers)
+      .where(eq(appUsers.clerkUserId, user.id))
+      .limit(1),
+    database
+      .select({ clerkUserId: appUsers.clerkUserId, role: appUsers.role, status: appUsers.status })
+      .from(appUsers)
+      .where(eq(appUsers.email, email))
+      .limit(1),
+  ]);
+
+  if (existingUser?.status === "suspended") redirect("/access-required?workspace=advertiser");
+
+  if (!existingUser) {
+    if (emailOwner && emailOwner.status !== "invited") {
+      redirect("/advertiser?error=account-conflict");
+    }
+
+    // A host invitation may already reserve this verified email. Move the
+    // invitation to a deterministic claim address so this Clerk identity can
+    // be created without losing the venue assignment waiting to be claimed.
+    if (emailOwner) {
+      await database
+        .update(appUsers)
+        .set({ email: `claiming.${user.id}@neusecast.invalid`, updatedAt: new Date() })
+        .where(eq(appUsers.clerkUserId, emailOwner.clerkUserId));
+    }
+
+    await database.insert(appUsers).values({
       clerkUserId: user.id,
       email,
       displayName: user.fullName ?? businessName,
       role: "advertiser",
-    })
-    .onConflictDoNothing();
+      status: "active",
+    });
+  }
 
   await database
     .insert(advertiserAccounts)
