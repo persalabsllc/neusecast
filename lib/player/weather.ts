@@ -81,7 +81,7 @@ async function requestRegionalForecast(): Promise<RegionalForecast> {
     throw new Error("NWS did not return a valid regional forecast endpoint.");
   }
   const forecast = await nwsJson<NwsForecastResponse>(forecastUrl);
-  const periods = (forecast.properties?.periods ?? []).slice(0, 3).flatMap((period) => {
+  const periods = (forecast.properties?.periods ?? []).slice(0, 6).flatMap((period) => {
     const name = boundedText(period.name, 40);
     const shortForecast = boundedText(period.shortForecast, 90);
     const startsAt = boundedText(period.startTime, 40);
@@ -162,7 +162,7 @@ export function regionalWeatherItem(forecast: RegionalForecast): PlayerItem {
     source: "generated_content",
     campaignId: null,
     creativeId: null,
-    durationSeconds: 16,
+    durationSeconds: 60,
     eyebrow: "Eastern North Carolina forecast",
     title: `${current.name}: ${current.shortForecast}`,
     body: [

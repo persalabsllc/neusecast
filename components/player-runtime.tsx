@@ -60,41 +60,112 @@ function ForecastIcon({ forecast }: { forecast: string }) {
   return <CloudSun />;
 }
 
-function WeatherVisual({ item, location }: { item: PlayerItem; location: string }) {
+function WeatherBroadcast({ item, location }: { item: PlayerItem; location: string }) {
   const forecast = `${item.title} ${item.body}`;
   const periods = item.weatherPeriods ?? [];
   const currentPeriod = periods[0];
   const temperature = currentPeriod
     ? `${currentPeriod.temperature}°`
     : extractTemperature(forecast);
+  const tickerText = periods.length
+    ? periods.map((period) => (
+      `${period.name}: ${period.temperature}° · ${period.shortForecast}${period.precipitationChance === null ? "" : ` · ${period.precipitationChance}% rain`}`
+    )).join("     •     ")
+    : item.body;
 
   return (
-    <div className="player-weather-panel">
-      <div className="player-weather-scene">
-        <span className="player-weather-sun" />
-        <span className="player-weather-cloud"><ForecastIcon forecast={forecast} /></span>
-        <span className="player-weather-wind player-weather-wind-one" />
-        <span className="player-weather-wind player-weather-wind-two" />
-      </div>
-      <div className="player-weather-reading">
-        <strong>{temperature ?? "Forecast"}</strong>
-        <span>{location}</span>
-      </div>
-      {periods.length ? (
+    <div className="player-weather-broadcast">
+      <section className="player-weather-segment player-weather-segment-current">
+        <div className="player-weather-broadcast-copy">
+          <span>NeuseCast Weather Center</span>
+          <h1>{currentPeriod?.name ?? "Right now"}</h1>
+          <p>{currentPeriod?.shortForecast ?? item.title}</p>
+          <div className="player-weather-facts">
+            <strong>{temperature ?? "Forecast"}</strong>
+            <span>{currentPeriod?.windDirection} {currentPeriod?.windSpeed}</span>
+            <span>{currentPeriod?.precipitationChance ?? 0}% rain chance</span>
+          </div>
+        </div>
+        <div className="player-weather-hero" aria-hidden="true">
+          <span className="player-weather-sun" />
+          <span className="player-weather-cloud"><ForecastIcon forecast={forecast} /></span>
+          <span className="player-weather-wind player-weather-wind-one" />
+          <span className="player-weather-wind player-weather-wind-two" />
+          <i>Live NWS forecast</i>
+        </div>
+      </section>
+
+      <section className="player-weather-segment player-weather-segment-map">
+        <div className="player-weather-map-heading">
+          <span>Regional outlook</span>
+          <h1>Eastern North Carolina</h1>
+          <p>{currentPeriod?.shortForecast ?? item.title}</p>
+        </div>
+        <div className="player-weather-map" aria-hidden="true">
+          <svg viewBox="0 0 820 430" role="img">
+            <title>Stylized Eastern North Carolina regional weather map</title>
+            <path className="player-weather-map-land" d="M42 50H550L615 82 602 118 654 148 625 181 682 212 645 250 702 286 662 326 711 365 675 408H42Z" />
+            <path className="player-weather-map-coast" d="M550 50 615 82 602 118 654 148 625 181 682 212 645 250 702 286 662 326 711 365 675 408" />
+            <path className="player-weather-map-river" d="M104 185C218 154 282 211 371 188S522 129 621 164" />
+            <g className="player-weather-map-band">
+              <path d="M-70 360C95 305 172 213 300 182S510 119 895 66" />
+              <path d="M-90 405C100 347 192 262 325 229S575 153 910 112" />
+            </g>
+            <g className="player-weather-map-cities">
+              <circle cx="245" cy="98" r="7" /><text x="261" y="104">Greenville</text>
+              <circle cx="410" cy="118" r="7" /><text x="426" y="124">Washington</text>
+              <circle cx="191" cy="216" r="7" /><text x="207" y="222">Kinston</text>
+              <circle className="is-primary" cx="428" cy="235" r="10" /><text className="is-primary" x="448" y="242">New Bern · {temperature ?? "--"}</text>
+              <circle cx="240" cy="337" r="7" /><text x="256" y="343">Jacksonville</text>
+              <circle cx="555" cy="344" r="7" /><text x="571" y="350">Morehead City</text>
+            </g>
+          </svg>
+          <div className="player-weather-map-key"><ForecastIcon forecast={forecast} /><span>{currentPeriod?.shortForecast ?? "Regional forecast"}</span></div>
+        </div>
+      </section>
+
+      <section className="player-weather-segment player-weather-segment-periods">
+        <div className="player-weather-section-heading">
+          <span>Forecast timeline</span>
+          <h1>The next 36 hours</h1>
+        </div>
         <div className="player-weather-periods">
-          {periods.map((period) => (
+          {periods.slice(0, 4).map((period) => (
             <div key={`${period.name}:${period.startsAt}`}>
               <span><ForecastIcon forecast={period.shortForecast} /></span>
               <small>{period.name}</small>
               <strong>{period.temperature}°</strong>
-              <em>{period.precipitationChance === null ? period.shortForecast : `${period.precipitationChance}% rain`}</em>
+              <p>{period.shortForecast}</p>
+              <em>{period.precipitationChance === null ? period.windSpeed : `${period.precipitationChance}% rain · ${period.windSpeed}`}</em>
             </div>
           ))}
         </div>
-      ) : null}
-      <div className="player-weather-meta">
-        <span>National Weather Service</span>
-        <span>Live regional outlook</span>
+      </section>
+
+      <section className="player-weather-segment player-weather-segment-outlook">
+        <div className="player-weather-section-heading">
+          <span>Planning forecast</span>
+          <h1>Your regional outlook</h1>
+          <p>Updated live from the National Weather Service for Eastern North Carolina.</p>
+        </div>
+        <div className="player-weather-outlook-grid">
+          {periods.slice(0, 3).map((period) => (
+            <article key={`${period.name}:${period.endsAt}`}>
+              <ForecastIcon forecast={period.shortForecast} />
+              <div><small>{period.name}</small><strong>{period.temperature}°</strong></div>
+              <p>{period.shortForecast}</p>
+            </article>
+          ))}
+        </div>
+        <div className="player-weather-source">National Weather Service · Live regional forecast</div>
+      </section>
+
+      <div className="player-weather-ticker" aria-hidden="true">
+        <strong>WEATHER</strong>
+        <div>
+          <span>{location} &nbsp; • &nbsp; {tickerText}</span>
+          <span>{location} &nbsp; • &nbsp; {tickerText}</span>
+        </div>
       </div>
     </div>
   );
@@ -887,7 +958,11 @@ export function PlayerRuntime({
       </header>
 
       <section className={`player-slide player-slide-${currentItem.kind}`} key={currentItem.id}>
-        <div className="player-copy">
+        {isWeather ? (
+          <WeatherBroadcast item={currentItem} location="Eastern North Carolina" />
+        ) : (
+          <>
+          <div className="player-copy">
           {isNews ? <div className="player-news-strap"><span>NeuseCast Newsroom</span> Local update</div> : null}
           <div className="player-eyebrow">
             <KindIcon kind={currentItem.kind} />
@@ -899,9 +974,7 @@ export function PlayerRuntime({
         </div>
 
         <div className="player-visual" aria-hidden="true">
-          {isWeather
-            ? <WeatherVisual item={currentItem} location="Eastern North Carolina" />
-            : currentItem.mediaUrl
+          {currentItem.mediaUrl
               ? (
                 <div className="player-visual-artwork">
                   <div
@@ -917,6 +990,8 @@ export function PlayerRuntime({
           <span>{currentItem.sponsor ?? kindLabels[currentItem.kind]}</span>
           {currentItem.mediaCredit ? <small className="player-media-credit">{currentItem.mediaCredit}</small> : null}
         </div>
+          </>
+        )}
 
         {isNews ? (
           <div className="player-news-ticker" aria-hidden="true">
