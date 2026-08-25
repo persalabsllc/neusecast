@@ -5420,9 +5420,10 @@ a.contact-card:hover { border-color: rgba(67, 221, 193, 0.35); background: rgba(
   --player-accent-rgb: 67, 221, 193;
   position: relative;
   display: grid;
+  container-type: inline-size;
   grid-template-rows: auto 1fr auto;
   isolation: isolate;
-  padding: clamp(24px, 3.2vw, 62px) clamp(30px, 5.2vw, 100px) clamp(22px, 2.7vw, 52px);
+  padding: clamp(22px, 2.6vw, 50px) clamp(28px, 4vw, 76px) clamp(20px, 2.3vw, 44px);
   background:
     radial-gradient(circle at 78% 34%, rgba(var(--player-accent-rgb), 0.18), transparent 31%),
     linear-gradient(132deg, #061419 0%, #092229 54%, #07171d 100%);
@@ -6904,6 +6905,58 @@ a.contact-card:hover { border-color: rgba(67, 221, 193, 0.35); background: rgba(
   color: #e0ebea;
   font-size: clamp(8px, 0.8vw, 14px);
   white-space: nowrap;
+}
+
+/* Keep desktop and venue-screen typography tied to the fixed 16:9 canvas. */
+@media (min-width: 761px) {
+  .player-slide:not(.player-slide-weather) {
+    gap: clamp(28px, 3.7cqw, 72px);
+    padding: clamp(26px, 3.6cqw, 66px) 0;
+  }
+
+  .player-slide-weather { padding-top: clamp(10px, 1.1cqw, 22px); }
+
+  .player-weather-segment {
+    bottom: clamp(44px, 4.3cqw, 82px);
+    gap: clamp(24px, 3.2cqw, 62px);
+  }
+
+  .player-weather-segment-current { grid-template-columns: minmax(0, 1.08fr) minmax(300px, 0.92fr); }
+  .player-weather-segment-map { grid-template-columns: minmax(275px, 0.58fr) minmax(0, 1.42fr); }
+
+  .player-weather-broadcast-copy > span,
+  .player-weather-map-heading > span,
+  .player-weather-section-heading > span { font-size: clamp(11px, 0.9cqw, 17px); }
+
+  .player-weather-broadcast-copy h1,
+  .player-weather-map-heading h1,
+  .player-weather-section-heading h1 { font-size: clamp(48px, 5.8cqw, 108px); }
+
+  .player-weather-broadcast-copy > p,
+  .player-weather-map-heading > p,
+  .player-weather-section-heading > p { font-size: clamp(17px, 1.65cqw, 31px); }
+
+  .player-weather-facts strong { font-size: clamp(66px, 8cqw, 148px); }
+  .player-weather-facts span { font-size: clamp(11px, 0.9cqw, 17px); }
+  .player-weather-hero { width: min(38cqw, 680px); }
+  .player-weather-map-cities text { font-size: 23px; }
+  .player-weather-map-cities text.is-primary { font-size: 28px; }
+  .player-weather-map-key { font-size: clamp(9px, 0.72cqw, 14px); }
+
+  .player-weather-segment-periods .player-weather-periods > div {
+    min-height: clamp(170px, 18cqw, 330px);
+  }
+
+  .player-weather-segment-periods .player-weather-periods small,
+  .player-weather-segment-periods .player-weather-periods p { font-size: clamp(10px, 0.82cqw, 16px); }
+  .player-weather-segment-periods .player-weather-periods strong { font-size: clamp(36px, 3.9cqw, 72px); }
+  .player-weather-segment-periods .player-weather-periods em { font-size: clamp(9px, 0.68cqw, 13px); }
+  .player-weather-outlook-grid article small,
+  .player-weather-outlook-grid article p { font-size: clamp(10px, 0.8cqw, 15px); }
+  .player-weather-outlook-grid article strong { font-size: clamp(30px, 3.1cqw, 58px); }
+  .player-weather-source { font-size: clamp(9px, 0.68cqw, 13px); }
+  .player-weather-ticker > strong { font-size: clamp(9px, 0.72cqw, 14px); }
+  .player-weather-ticker span { font-size: clamp(10px, 0.82cqw, 15px); }
 }
 
 .player-news-signal {

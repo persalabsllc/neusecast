@@ -585,6 +585,8 @@ export function PlayerRuntime({
     const expiresAt = Date.parse(item.expiresAt);
     return Number.isFinite(expiresAt) && expiresAt > serverNowMs;
   }), [manifest.items, manifest.version, playedAdvertisements, preview, serverNowMs]);
+  const playableItemsRef = useRef(playableItems);
+  const playableItemsSignature = playableItems.map((item) => item.id).join("|");
   const displayedIndex = activeIndex < playableItems.length ? activeIndex : 0;
   const currentItem = playableItems[displayedIndex] ?? null;
   const isNews = currentItem?.kind === "news";
@@ -605,6 +607,10 @@ export function PlayerRuntime({
     const expiresAt = Date.parse(alert.expiresAt);
     return Number.isFinite(expiresAt) && expiresAt > serverNowMs;
   }), [manifest.alerts, serverNowMs]);
+
+  useEffect(() => {
+    playableItemsRef.current = playableItems;
+  }, [playableItems]);
 
   const location = useMemo(
     () => [manifest.venue.city, manifest.venue.state].filter(Boolean).join(", "),
@@ -990,10 +996,15 @@ export function PlayerRuntime({
       }
       if (isEvergreenFiller(currentItem)) recentEvergreenPlays.set(currentItem.id, completedAt);
 
-      let nextIndex = (displayedIndex + 1) % playableItems.length;
-      for (let offset = 0; offset < playableItems.length; offset += 1) {
-        const candidateIndex = (displayedIndex + 1 + offset) % playableItems.length;
-        const candidate = playableItems[candidateIndex];
+      const currentPlayableItems = playableItemsRef.current;
+      if (currentPlayableItems.length === 0) {
+        setActiveIndex(0);
+        return;
+      }
+      let nextIndex = (displayedIndex + 1) % currentPlayableItems.length;
+      for (let offset = 0; offset < currentPlayableItems.length; offset += 1) {
+        const candidateIndex = (displayedIndex + 1 + offset) % currentPlayableItems.length;
+        const candidate = currentPlayableItems[candidateIndex];
         const lastPlayedAt = recentEvergreenPlays.get(candidate.id);
         if (!isEvergreenFiller(candidate) || !lastPlayedAt || completedAt - lastPlayedAt >= EVERGREEN_REPLAY_GAP_MS) {
           nextIndex = candidateIndex;
@@ -1006,7 +1017,7 @@ export function PlayerRuntime({
     return () => {
       window.clearTimeout(advance);
     };
-  }, [accessRevoked, currentItem, displayedIndex, manifest.version, manifestExpired, playableItems, playerVersion, preview, publicFeed, refreshManifest, sendPlayback]);
+  }, [accessRevoked, currentItem, displayedIndex, manifest.version, manifestExpired, playableItemsSignature, playerVersion, preview, publicFeed, refreshManifest, sendPlayback]);
 
   if (accessRevoked) {
     return (
