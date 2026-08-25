@@ -64,6 +64,7 @@ export default function Home() {
           <Brand href="/" />
 
           <div className="sales-nav-links">
+            <Link href="/watch">Watch Live</Link>
             <a href="#advertisers">Advertise</a>
             <a href="#how-it-works">How it works</a>
             <a href="#hosts">Host a screen</a>
@@ -310,6 +311,7 @@ export default function Home() {
             <p>Eastern Carolina&apos;s Local Screen Network</p>
           </div>
           <div className="sales-footer-links">
+            <Link href="/watch">Watch Live</Link>
             <a href="#advertisers">Advertise</a>
             <a href="#hosts">Host a screen</a>
             <Link href="/advertiser">Advertiser login</Link>

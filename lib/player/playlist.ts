@@ -60,7 +60,7 @@ function interleaveSupport(hostItems: PlayerItem[], fillerItems: PlayerItem[]) {
   return support;
 }
 
-function interleaveRotation(advertisements: PlayerItem[], hostItems: PlayerItem[], fillerItems: PlayerItem[]) {
+export function interleaveRotation(advertisements: PlayerItem[], hostItems: PlayerItem[], fillerItems: PlayerItem[]) {
   const support = interleaveSupport(hostItems, fillerItems);
   const advertisementQueue = advertisements.slice(0, Math.max(1, Math.ceil(support.length / 3)));
   const base: PlayerItem[] = [];

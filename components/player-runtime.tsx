@@ -11,6 +11,7 @@ import {
   History,
   Lightbulb,
   MapPin,
+  Maximize2,
   Newspaper,
   Radio,
   Store,
@@ -363,6 +364,8 @@ export function PlayerRuntime({
   playerKey,
   playerVersion = "neusecast-web",
   preview = false,
+  publicFeed = false,
+  embedded = false,
 }: {
   initialManifest: PlayerManifest;
   initialItemId?: string | null;
@@ -370,6 +373,8 @@ export function PlayerRuntime({
   playerKey: string;
   playerVersion?: string;
   preview?: boolean;
+  publicFeed?: boolean;
+  embedded?: boolean;
 }) {
   const [manifest, setManifest] = useState(initialManifest);
   const [activeIndex, setActiveIndex] = useState(() => {
@@ -379,7 +384,7 @@ export function PlayerRuntime({
   const [clock, setClock] = useState("");
   const [accessRevoked, setAccessRevoked] = useState(false);
   const [identity] = useState<DeviceIdentity | null>(() => {
-    if (preview || typeof window === "undefined") return null;
+    if (preview || publicFeed || typeof window === "undefined") return null;
     return getOrCreateDeviceIdentity(playerKey);
   });
   const [clockSync, setClockSync] = useState(() => ({
@@ -408,6 +413,7 @@ export function PlayerRuntime({
   const pairingTokenRef = useRef(pairingToken ?? null);
   const flushingPlayback = useRef(false);
   const refreshingManifest = useRef(false);
+  const stageRef = useRef<HTMLElement | null>(null);
   const playableItems = useMemo(() => manifest.items.filter((item) => {
     if (
       !preview
@@ -436,9 +442,17 @@ export function PlayerRuntime({
   }), [manifest.alerts, serverNowMs]);
 
   const location = useMemo(
-    () => `${manifest.venue.city}, ${manifest.venue.state}`,
+    () => [manifest.venue.city, manifest.venue.state].filter(Boolean).join(", "),
     [manifest.venue.city, manifest.venue.state],
   );
+
+  const toggleFullscreen = useCallback(() => {
+    if (document.fullscreenElement) {
+      void document.exitFullscreen();
+      return;
+    }
+    void stageRef.current?.requestFullscreen();
+  }, []);
 
   const syncServerClock = useCallback((serverTime: string, timeZone?: string) => {
     const offsetMs = clockOffset(serverTime);
@@ -530,17 +544,17 @@ export function PlayerRuntime({
   }, [identity, playerKey, revokePlayerAccess]);
 
   const refreshManifest = useCallback(async () => {
-    if (!identity || refreshingManifest.current) return false;
+    if ((!identity && !publicFeed) || refreshingManifest.current) return false;
     refreshingManifest.current = true;
 
     try {
-      const response = await fetchWithTimeout(`/api/player/${playerKey}/manifest`, {
+      const response = await fetchWithTimeout(publicFeed ? "/api/watch/manifest" : `/api/player/${playerKey}/manifest`, {
         cache: "no-store",
-        headers: authenticatedHeaders(identity),
+        headers: identity ? authenticatedHeaders(identity) : undefined,
       }).catch(() => null);
 
       if (!response?.ok) {
-        if (response && AUTHORIZATION_FAILURE_STATUSES.has(response.status)) {
+        if (!publicFeed && response && AUTHORIZATION_FAILURE_STATUSES.has(response.status)) {
           revokePlayerAccess();
           return false;
         }
@@ -578,13 +592,15 @@ export function PlayerRuntime({
     } finally {
       refreshingManifest.current = false;
     }
-  }, [anchorManifestFreshness, identity, playerKey, revokePlayerAccess, syncServerClock]);
+  }, [anchorManifestFreshness, identity, playerKey, publicFeed, revokePlayerAccess, syncServerClock]);
 
   useEffect(() => {
-    if (preview || !identity) return;
+    if (preview || (!identity && !publicFeed)) return;
     const initialize = window.setTimeout(() => {
-      sessionId.current = crypto.randomUUID();
-      playbackQueue.current = readPlaybackQueue(playerKey);
+      if (!publicFeed) {
+        sessionId.current = crypto.randomUUID();
+        playbackQueue.current = readPlaybackQueue(playerKey);
+      }
       const cached = readCachedManifest(playerKey);
       const cachedServerTime = Date.parse(cached?.manifest.serverTime ?? "");
       const initialServerTime = Date.parse(initialManifest.serverTime);
@@ -613,12 +629,12 @@ export function PlayerRuntime({
       anchorManifestFreshness(cacheManifest(playerKey, initialManifest));
     }, 0);
     return () => window.clearTimeout(initialize);
-  }, [anchorManifestFreshness, identity, initialManifest, playerKey, preview, syncServerClock]);
+  }, [anchorManifestFreshness, identity, initialManifest, playerKey, preview, publicFeed, syncServerClock]);
 
   useEffect(() => {
-    if (preview || !("serviceWorker" in navigator)) return;
+    if (preview || publicFeed || !("serviceWorker" in navigator)) return;
     void navigator.serviceWorker.register("/neusecast-player-sw.js", { scope: "/player/" }).catch(() => undefined);
-  }, [preview]);
+  }, [preview, publicFeed]);
 
   useEffect(() => {
     currentItemId.current = currentItem?.id ?? null;
@@ -740,7 +756,7 @@ export function PlayerRuntime({
   }, [accessRevoked, flushPlaybackQueue, identity, playerKey, playerVersion, refreshManifest, revokePlayerAccess, syncServerClock]);
 
   useEffect(() => {
-    if (!identity || accessRevoked) return;
+    if ((!identity && !publicFeed) || accessRevoked) return;
     let cancelled = false;
     let retryCount = 0;
     let timeout: number | undefined;
@@ -760,10 +776,10 @@ export function PlayerRuntime({
     };
 
     const onOnline = () => schedule(0);
-    // Every normal mount performs an immediate authenticated refresh. Besides
-    // picking up last-minute changes, this snapshots the exact manifest that
-    // the device is about to play for later proof-of-play validation.
-    schedule(pairingTokenRef.current ? 5_000 : 0);
+    // Physical players authenticate and snapshot manifests for proof-of-play.
+    // The public channel uses the same refresh loop without device enrollment
+    // or playback reporting.
+    schedule(!publicFeed && pairingTokenRef.current ? 5_000 : 0);
     window.addEventListener("online", onOnline);
 
     return () => {
@@ -771,13 +787,13 @@ export function PlayerRuntime({
       window.clearTimeout(timeout);
       window.removeEventListener("online", onOnline);
     };
-  }, [accessRevoked, identity, manifest.refreshAfterSeconds, refreshManifest]);
+  }, [accessRevoked, identity, manifest.refreshAfterSeconds, publicFeed, refreshManifest]);
 
   useEffect(() => {
     if (!currentItem || accessRevoked || manifestExpired) return;
 
     const advance = window.setTimeout(() => {
-      if (!preview) {
+      if (!preview && !publicFeed) {
         if (currentItem.kind === "advertisement") {
           setPlayedAdvertisements((current) => {
             const ids = current.manifestVersion === manifest.version
@@ -808,7 +824,7 @@ export function PlayerRuntime({
     return () => {
       window.clearTimeout(advance);
     };
-  }, [accessRevoked, currentItem, displayedIndex, manifest.version, manifestExpired, playableItems.length, playerVersion, preview, refreshManifest, sendPlayback]);
+  }, [accessRevoked, currentItem, displayedIndex, manifest.version, manifestExpired, playableItems.length, playerVersion, preview, publicFeed, refreshManifest, sendPlayback]);
 
   if (accessRevoked) {
     return (
@@ -846,7 +862,8 @@ export function PlayerRuntime({
 
   return (
     <main
-      className={`player-stage player-theme-${currentItem.theme} player-kind-${currentItem.kind}${hasMedia ? " player-has-media" : ""}${isEditorialPhoto ? " player-editorial-photo" : ""}${activeAlerts.length ? " player-has-alert" : ""}`}
+      ref={stageRef}
+      className={`player-stage player-theme-${currentItem.theme} player-kind-${currentItem.kind}${hasMedia ? " player-has-media" : ""}${isEditorialPhoto ? " player-editorial-photo" : ""}${activeAlerts.length ? " player-has-alert" : ""}${embedded ? " player-embedded" : ""}`}
       style={playerStyle}
     >
       <div className="player-orbit player-orbit-one" aria-hidden="true" />
@@ -858,9 +875,14 @@ export function PlayerRuntime({
           <span><strong>NeuseCast</strong><small>Local screens, connected.</small></span>
         </div>
         <div className="player-status">
-          <span className="player-live"><i aria-hidden="true" /> {preview ? "PREVIEW" : "LIVE"}</span>
+          <span className="player-live"><i aria-hidden="true" /> {publicFeed ? "NETWORK LIVE" : preview ? "PREVIEW" : "LIVE"}</span>
           <span><MapPin size={17} aria-hidden="true" /> {location}</span>
           <strong>{clock}</strong>
+          {embedded ? (
+            <button className="player-fullscreen" type="button" onClick={toggleFullscreen} aria-label="Toggle fullscreen">
+              <Maximize2 aria-hidden="true" />
+            </button>
+          ) : null}
         </div>
       </header>
 
@@ -923,7 +945,7 @@ export function PlayerRuntime({
       <footer className="player-footer">
         <span>{manifest.venue.name}</span>
         <span className="player-position">{displayedIndex + 1} / {playableItems.length}</span>
-        <span>{preview ? "Control Room playlist preview" : "Eastern Carolina's local screen network"}</span>
+        <span>{publicFeed ? "Network-wide feed · Local host posts excluded" : preview ? "Control Room playlist preview" : "Eastern Carolina's local screen network"}</span>
       </footer>
 
       <div className="player-progress" aria-hidden="true">
