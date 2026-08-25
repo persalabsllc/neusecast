@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import {
   CalendarDays,
+  CloudFog,
   CloudLightning,
   CloudRain,
   CloudSnow,
@@ -55,15 +56,31 @@ function ForecastIcon({ forecast }: { forecast: string }) {
   if (/thunder|lightning|storm/u.test(normalized)) return <CloudLightning />;
   if (/snow|sleet|flurr/u.test(normalized)) return <CloudSnow />;
   if (/rain|shower|drizzle/u.test(normalized)) return <CloudRain />;
+  if (/fog|mist|haze/u.test(normalized)) return <CloudFog />;
   if (/wind|breez|gust/u.test(normalized)) return <Wind />;
   if (/sunny|clear/u.test(normalized)) return <Sun />;
   return <CloudSun />;
+}
+
+type WeatherCondition = "storm" | "snow" | "rain" | "fog" | "wind" | "clear" | "cloudy";
+
+function weatherCondition(forecast: string): WeatherCondition {
+  const normalized = forecast.toLowerCase();
+  if (/thunder|lightning|storm|tornado/u.test(normalized)) return "storm";
+  if (/snow|sleet|flurr|ice|freez/u.test(normalized)) return "snow";
+  if (/rain|shower|drizzle/u.test(normalized)) return "rain";
+  if (/fog|mist|haze/u.test(normalized)) return "fog";
+  if (/wind|breez|gust/u.test(normalized)) return "wind";
+  if (/sunny|clear|hot/u.test(normalized)) return "clear";
+  return "cloudy";
 }
 
 function WeatherBroadcast({ item, location }: { item: PlayerItem; location: string }) {
   const forecast = `${item.title} ${item.body}`;
   const periods = item.weatherPeriods ?? [];
   const currentPeriod = periods[0];
+  const currentForecast = currentPeriod?.shortForecast ?? item.title;
+  const condition = weatherCondition(currentForecast);
   const temperature = currentPeriod
     ? `${currentPeriod.temperature}°`
     : extractTemperature(forecast);
@@ -74,7 +91,7 @@ function WeatherBroadcast({ item, location }: { item: PlayerItem; location: stri
     : item.body;
 
   return (
-    <div className="player-weather-broadcast">
+    <div className={`player-weather-broadcast player-weather-condition-${condition}`}>
       <section className="player-weather-segment player-weather-segment-current">
         <div className="player-weather-broadcast-copy">
           <span>NeuseCast Weather Center</span>
@@ -88,9 +105,14 @@ function WeatherBroadcast({ item, location }: { item: PlayerItem; location: stri
         </div>
         <div className="player-weather-hero" aria-hidden="true">
           <span className="player-weather-sun" />
-          <span className="player-weather-cloud"><ForecastIcon forecast={forecast} /></span>
+          <span className="player-weather-cloud"><ForecastIcon forecast={currentForecast} /></span>
           <span className="player-weather-wind player-weather-wind-one" />
           <span className="player-weather-wind player-weather-wind-two" />
+          <span className="player-weather-rain" />
+          <span className="player-weather-snow" />
+          <span className="player-weather-fog player-weather-fog-one" />
+          <span className="player-weather-fog player-weather-fog-two" />
+          <span className="player-weather-lightning" />
           <i>Live NWS forecast</i>
         </div>
       </section>
@@ -120,7 +142,7 @@ function WeatherBroadcast({ item, location }: { item: PlayerItem; location: stri
               <circle cx="555" cy="344" r="7" /><text x="571" y="350">Morehead City</text>
             </g>
           </svg>
-          <div className="player-weather-map-key"><ForecastIcon forecast={forecast} /><span>{currentPeriod?.shortForecast ?? "Regional forecast"}</span></div>
+          <div className="player-weather-map-key"><ForecastIcon forecast={currentForecast} /><span>{currentPeriod?.shortForecast ?? "Regional forecast"}</span></div>
         </div>
       </section>
 

@@ -5914,6 +5914,9 @@ a.contact-card:hover { border-color: rgba(67, 221, 193, 0.35); background: rgba(
 }
 
 .player-weather-broadcast {
+  --weather-map-band-primary: rgba(116, 200, 255, 0.62);
+  --weather-map-band-secondary: rgba(183, 218, 225, 0.48);
+  --weather-sky-start: rgba(87, 172, 224, 0.25);
   position: relative;
   width: 100%;
   height: 100%;
@@ -6008,7 +6011,7 @@ a.contact-card:hover { border-color: rgba(67, 221, 193, 0.35); background: rgba(
   background:
     linear-gradient(rgba(143, 226, 255, 0.06) 1px, transparent 1px),
     linear-gradient(90deg, rgba(143, 226, 255, 0.06) 1px, transparent 1px),
-    linear-gradient(155deg, rgba(87, 172, 224, 0.31), rgba(5, 22, 27, 0.84));
+    linear-gradient(155deg, var(--weather-sky-start), rgba(5, 22, 27, 0.84));
   background-size: 32px 32px, 32px 32px, auto;
   box-shadow: 0 28px 90px rgba(0, 0, 0, 0.35);
 }
@@ -6024,6 +6027,127 @@ a.contact-card:hover { border-color: rgba(67, 221, 193, 0.35); background: rgba(
 
 .player-weather-hero .player-weather-cloud { width: 35%; }
 .player-weather-hero .player-weather-sun { width: 22%; }
+.player-weather-hero .player-weather-sun,
+.player-weather-hero .player-weather-wind,
+.player-weather-rain,
+.player-weather-snow,
+.player-weather-fog,
+.player-weather-lightning { opacity: 0; }
+.player-weather-hero .player-weather-wind { display: none; }
+
+.player-weather-condition-clear {
+  --weather-map-band-primary: rgba(255, 205, 91, 0.68);
+  --weather-map-band-secondary: rgba(255, 143, 84, 0.38);
+  --weather-sky-start: rgba(74, 169, 231, 0.42);
+}
+
+.player-weather-condition-rain {
+  --weather-map-band-primary: rgba(72, 222, 169, 0.72);
+  --weather-map-band-secondary: rgba(58, 149, 246, 0.67);
+  --weather-sky-start: rgba(63, 104, 130, 0.42);
+}
+
+.player-weather-condition-storm {
+  --weather-map-band-primary: rgba(255, 80, 71, 0.74);
+  --weather-map-band-secondary: rgba(255, 203, 74, 0.67);
+  --weather-sky-start: rgba(63, 66, 90, 0.5);
+}
+
+.player-weather-condition-snow {
+  --weather-map-band-primary: rgba(226, 248, 255, 0.82);
+  --weather-map-band-secondary: rgba(122, 202, 255, 0.68);
+  --weather-sky-start: rgba(137, 181, 207, 0.42);
+}
+
+.player-weather-condition-fog {
+  --weather-map-band-primary: rgba(210, 223, 225, 0.6);
+  --weather-map-band-secondary: rgba(160, 180, 184, 0.52);
+  --weather-sky-start: rgba(145, 166, 171, 0.34);
+}
+
+.player-weather-condition-wind {
+  --weather-map-band-primary: rgba(102, 228, 218, 0.7);
+  --weather-map-band-secondary: rgba(116, 200, 255, 0.58);
+  --weather-sky-start: rgba(72, 148, 184, 0.38);
+}
+
+.player-weather-condition-cloudy {
+  --weather-sky-start: rgba(103, 139, 156, 0.35);
+}
+
+.player-weather-condition-clear .player-weather-sun,
+.player-weather-condition-cloudy .player-weather-sun {
+  opacity: 1;
+}
+
+.player-weather-condition-cloudy .player-weather-sun { opacity: 0.34; }
+
+.player-weather-condition-wind .player-weather-wind,
+.player-weather-condition-rain .player-weather-wind,
+.player-weather-condition-storm .player-weather-wind {
+  display: block;
+  opacity: 1;
+}
+
+.player-weather-rain,
+.player-weather-snow,
+.player-weather-lightning,
+.player-weather-fog {
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.player-weather-rain {
+  inset: -38% 0 -20%;
+  background: repeating-linear-gradient(100deg, transparent 0 17px, rgba(151, 216, 255, 0.72) 18px 20px, transparent 21px 37px);
+  transform: translate3d(0, -28%, 0);
+  animation: player-weather-rain 0.72s linear infinite;
+}
+
+.player-weather-condition-rain .player-weather-rain,
+.player-weather-condition-storm .player-weather-rain { opacity: 0.72; }
+.player-weather-condition-storm .player-weather-rain { opacity: 0.92; }
+
+.player-weather-snow {
+  inset: -25% 0 -10%;
+  background-image:
+    radial-gradient(circle, rgba(255, 255, 255, 0.95) 0 2px, transparent 3px),
+    radial-gradient(circle, rgba(221, 244, 255, 0.82) 0 3px, transparent 4px),
+    radial-gradient(circle, rgba(255, 255, 255, 0.8) 0 1.5px, transparent 2.5px);
+  background-position: 7px 3px, 28px 34px, 53px 18px;
+  background-size: 58px 58px, 74px 74px, 43px 43px;
+  animation: player-weather-snow 5s linear infinite;
+}
+
+.player-weather-condition-snow .player-weather-snow { opacity: 0.9; }
+
+.player-weather-fog {
+  right: -15%;
+  left: -15%;
+  height: 11%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, rgba(226, 237, 238, 0.7), transparent);
+  filter: blur(3px);
+  animation: player-weather-fog 5.4s ease-in-out infinite alternate;
+}
+
+.player-weather-fog-one { top: 40%; }
+.player-weather-fog-two { top: 61%; animation-delay: -2.7s; }
+.player-weather-condition-fog .player-weather-fog { opacity: 0.75; }
+
+.player-weather-lightning {
+  top: 35%;
+  left: 55%;
+  width: 12%;
+  height: 34%;
+  background: #ffe66f;
+  clip-path: polygon(47% 0, 100% 0, 66% 42%, 91% 42%, 20% 100%, 38% 56%, 9% 56%);
+  filter: drop-shadow(0 0 15px rgba(255, 226, 94, 0.8));
+  animation: player-weather-lightning 3.7s steps(1, end) infinite;
+}
+
+.player-weather-condition-storm .player-weather-lightning { opacity: 1; }
 .player-weather-hero > i {
   position: absolute;
   z-index: 4;
@@ -6054,8 +6178,8 @@ a.contact-card:hover { border-color: rgba(67, 221, 193, 0.35); background: rgba(
 .player-weather-map-land { fill: rgba(19, 72, 75, 0.85); stroke: rgba(158, 223, 219, 0.3); stroke-width: 2; }
 .player-weather-map-coast { fill: none; stroke: #75d8d0; stroke-width: 4; }
 .player-weather-map-river { fill: none; stroke: rgba(116, 200, 255, 0.55); stroke-width: 7; }
-.player-weather-map-band { fill: none; stroke: rgba(255, 206, 92, 0.72); stroke-width: 34; stroke-linecap: round; opacity: 0.72; animation: player-weather-map-band 6s ease-in-out infinite alternate; }
-.player-weather-map-band path + path { stroke: rgba(89, 221, 190, 0.58); stroke-width: 24; }
+.player-weather-map-band { fill: none; stroke: var(--weather-map-band-primary); stroke-width: 34; stroke-linecap: round; opacity: 0.72; animation: player-weather-map-band 6s ease-in-out infinite alternate; }
+.player-weather-map-band path + path { stroke: var(--weather-map-band-secondary); stroke-width: 24; }
 .player-weather-map-cities circle { fill: #dcebea; stroke: #07191c; stroke-width: 3; }
 .player-weather-map-cities circle.is-primary { fill: #ffcf65; animation: player-pulse 1.8s ease-in-out infinite; }
 .player-weather-map-cities text { fill: #dcebea; font-size: 20px; font-weight: 700; paint-order: stroke; stroke: rgba(4, 19, 23, 0.85); stroke-width: 5px; }
@@ -6416,6 +6540,24 @@ a.contact-card:hover { border-color: rgba(67, 221, 193, 0.35); background: rgba(
 @keyframes player-weather-map-band {
   from { transform: translate3d(-7%, 5%, 0); opacity: 0.48; }
   to { transform: translate3d(8%, -5%, 0); opacity: 0.82; }
+}
+
+@keyframes player-weather-rain {
+  to { transform: translate3d(-7%, 28%, 0); }
+}
+
+@keyframes player-weather-snow {
+  to { transform: translate3d(3%, 26%, 0) rotate(2deg); }
+}
+
+@keyframes player-weather-fog {
+  from { transform: translate3d(-7%, 0, 0) scaleX(0.9); }
+  to { transform: translate3d(7%, 0, 0) scaleX(1.08); }
+}
+
+@keyframes player-weather-lightning {
+  0%, 8%, 12%, 100% { visibility: hidden; }
+  9%, 11% { visibility: visible; }
 }
 
 @media (max-width: 760px) {
