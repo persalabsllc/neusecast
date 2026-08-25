@@ -224,7 +224,7 @@ export function regionalWeatherItem(forecast: RegionalForecast): PlayerItem {
     campaignId: null,
     creativeId: null,
     durationSeconds: 60,
-    eyebrow: "Eastern North Carolina forecast",
+    eyebrow: "Captain 97.1 FM Weather Center",
     title: `${current.name}: ${current.shortForecast}`,
     body: [
       `${current.temperature}°${current.temperatureUnit}`,
@@ -235,7 +235,7 @@ export function regionalWeatherItem(forecast: RegionalForecast): PlayerItem {
     callToAction: null,
     mediaUrl: null,
     theme: current.isDaytime ? "blue" : "navy",
-    sponsor: "National Weather Service",
+    sponsor: "Captain 97.1 FM Weather Center · National Weather Service",
     contentCategory: "weather",
     mediaCredit: null,
     weatherPeriods: forecast.periods,

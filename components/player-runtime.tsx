@@ -118,7 +118,7 @@ function WeatherBroadcast({ item, location }: { item: PlayerItem; location: stri
     <div className={`player-weather-broadcast player-weather-condition-${condition}`}>
       <section className="player-weather-segment player-weather-segment-current">
         <div className="player-weather-broadcast-copy">
-          <span>NeuseCast Weather Center</span>
+          <span>From the Captain 97.1 FM Weather Center</span>
           <h1>{currentPeriod?.name ?? "Right now"}</h1>
           <p>{currentPeriod?.shortForecast ?? item.title}</p>
           <div className="player-weather-facts">
@@ -143,7 +143,7 @@ function WeatherBroadcast({ item, location }: { item: PlayerItem; location: stri
 
       <section className="player-weather-segment player-weather-segment-map">
         <div className="player-weather-map-heading">
-          <span>Regional outlook</span>
+          <span>Captain 97.1 FM Weather Center</span>
           <h1>Eastern North Carolina</h1>
           <p>{currentPeriod?.shortForecast ?? item.title}</p>
         </div>
@@ -172,7 +172,7 @@ function WeatherBroadcast({ item, location }: { item: PlayerItem; location: stri
 
       <section className="player-weather-segment player-weather-segment-periods">
         <div className="player-weather-section-heading">
-          <span>Forecast timeline</span>
+          <span>Captain 97.1 FM Weather Center</span>
           <h1>The next 36 hours</h1>
         </div>
         <div className="player-weather-periods">
@@ -190,7 +190,7 @@ function WeatherBroadcast({ item, location }: { item: PlayerItem; location: stri
 
       <section className="player-weather-segment player-weather-segment-outlook">
         <div className="player-weather-section-heading">
-          <span>Planning forecast</span>
+          <span>Captain 97.1 FM Weather Center</span>
           <h1>Your regional outlook</h1>
           <p>Updated live from the National Weather Service for Eastern North Carolina.</p>
         </div>
@@ -207,7 +207,7 @@ function WeatherBroadcast({ item, location }: { item: PlayerItem; location: stri
       </section>
 
       <div className="player-weather-ticker" aria-hidden="true">
-        <strong>WEATHER</strong>
+        <strong>97.1 WEATHER</strong>
         <div>
           <span>{location} &nbsp; • &nbsp; {tickerText}</span>
           <span>{location} &nbsp; • &nbsp; {tickerText}</span>
@@ -1108,7 +1108,7 @@ export function PlayerRuntime({
         ) : (
           <>
           <div className="player-copy">
-          {isNews ? <div className="player-news-strap"><span>NeuseCast Newsroom</span> Local update</div> : null}
+          {isNews ? <div className="player-news-strap"><span>Captain 97.1 FM News Desk</span> Local update</div> : null}
           <div className="player-eyebrow">
             <KindIcon kind={currentItem.kind} />
             {currentItem.eyebrow || kindLabels[currentItem.kind]}

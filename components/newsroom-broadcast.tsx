@@ -73,7 +73,7 @@ function StoryVisual({ story }: { story: PlayerNewsroomStory }) {
     <div className="newsroom-signal-card">
       <span><Radio /></span>
       <i /><i /><i />
-      <strong>NeuseCast<br />Newsroom</strong>
+      <strong>Captain 97.1 FM<br />News Desk</strong>
     </div>
   );
 }
@@ -119,7 +119,7 @@ export function NewsroomBroadcast({
           preload="auto"
           src={edition.videoUrl}
         />
-        <div className="newsroom-video-bug"><i /> LIVE · NEUSECAST NEWSROOM</div>
+        <div className="newsroom-video-bug"><i /> LIVE · CAPTAIN 97.1 FM NEWS DESK</div>
       </div>
     );
   }
@@ -143,7 +143,7 @@ export function NewsroomBroadcast({
     <div className="newsroom-broadcast" key={sceneKey}>
       <div className="newsroom-grid" aria-hidden="true" />
       <div className="newsroom-topline">
-        <span><i /> NEUSECAST NEWSROOM</span>
+        <span><i /> CAPTAIN 97.1 FM NEWS DESK</span>
         <strong>{location || "Eastern North Carolina"}</strong>
         <small>UPDATED {timeLabel(edition.updatedAt)}</small>
       </div>
@@ -152,7 +152,7 @@ export function NewsroomBroadcast({
         <div className="newsroom-open">
           <div className="newsroom-open-rings"><i /><i /><i /></div>
           <Newspaper />
-          <span>Now from Eastern North Carolina</span>
+          <span>From the Captain 97.1 FM News Desk</span>
           <h1>NeuseCast<br /><em>Newsroom</em></h1>
           <p>{edition.label}</p>
         </div>
@@ -195,7 +195,7 @@ export function NewsroomBroadcast({
         <div className="newsroom-close">
           <span>That&apos;s the latest</span>
           <h1>Local news.<br />Built for here.</h1>
-          <p>Updates twice daily from the NeuseCast Newsroom.</p>
+          <p>Updates twice daily from the Captain 97.1 FM News Desk.</p>
           <strong>NeuseCast.com</strong>
         </div>
       ) : null}
