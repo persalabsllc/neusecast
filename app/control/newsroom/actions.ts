@@ -10,6 +10,12 @@ import { newsroomEditions, newsroomStories } from "@/lib/db/schema";
 import { generateNewsroomEdition, rebuildNewsroomEdition } from "@/lib/newsroom/generator";
 import type { NewsroomSlot } from "@/lib/newsroom/types";
 
+export type NewsroomGenerationActionState = {
+  status: "idle" | "success" | "error";
+  message: string;
+  editionId: string | null;
+};
+
 async function requireControlUser() {
   const user = await currentUser();
   const email = verifiedPrimaryEmail(user);
@@ -30,15 +36,46 @@ function refreshNewsroom(editionId?: string) {
   if (editionId) revalidatePath(`/control/newsroom/${editionId}`);
 }
 
-export async function generateNewsroomEditionAction(formData: FormData) {
+export async function generateNewsroomEditionAction(
+  _previousState: NewsroomGenerationActionState,
+  formData: FormData,
+): Promise<NewsroomGenerationActionState> {
   await requireControlUser();
   const market = value(formData, "market", 100) || "Eastern North Carolina";
   const requestedSlot = value(formData, "slot", 24);
   const slot: NewsroomSlot = requestedSlot === "morning" || requestedSlot === "afternoon"
     ? requestedSlot
     : "manual";
-  await generateNewsroomEdition({ market, slot, force: true });
+  console.log("[newsroom:manual] generation started", { market, slot });
+  const result = await generateNewsroomEdition({ market, slot, force: true });
+  console.log("[newsroom:manual] generation completed", {
+    market,
+    slot,
+    editionId: result.editionId,
+    createdStories: result.createdStories,
+    autoApprovedStories: result.autoApprovedStories,
+    reviewStories: result.reviewStories,
+    published: result.published,
+    error: result.error,
+  });
   refreshNewsroom();
+  if (result.error) {
+    return {
+      status: "error",
+      message: `The newsroom could not complete this edition: ${result.error}`,
+      editionId: result.editionId,
+    };
+  }
+  const reviewMessage = result.reviewStories
+    ? ` ${result.reviewStories} sensitive ${result.reviewStories === 1 ? "story is" : "stories are"} waiting for review.`
+    : "";
+  return {
+    status: "success",
+    message: result.published
+      ? `Edition created with ${result.createdStories} verified stories and placed on air.${reviewMessage}`
+      : `Edition created with ${result.createdStories} verified stories. Approve at least four stories to publish it.${reviewMessage}`,
+    editionId: result.editionId,
+  };
 }
 
 export async function reviewNewsroomStoryAction(formData: FormData) {

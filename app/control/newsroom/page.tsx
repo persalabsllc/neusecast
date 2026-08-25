@@ -7,18 +7,19 @@ import {
   Clock3,
   Newspaper,
   Play,
-  Radio,
   ShieldCheck,
 } from "lucide-react";
 import { getDatabase } from "@/lib/db";
 import { newsroomEditions, newsroomSources, newsroomStories } from "@/lib/db/schema";
+import { NewsroomGenerateControls } from "@/components/newsroom-generate-controls";
 import {
-  generateNewsroomEditionAction,
   publishNewsroomEditionAction,
   reviewNewsroomStoryAction,
   updateNewsroomStoryAction,
   withdrawNewsroomEditionAction,
 } from "./actions";
+
+export const maxDuration = 300;
 
 function shortDate(value: Date | null) {
   if (!value) return "Not yet";
@@ -66,25 +67,14 @@ export default async function NewsroomControlPage() {
           <h2>NeuseCast Newsroom</h2>
           <p>Two daily, source-attributed local editions with animated broadcast graphics and mandatory review for sensitive reporting.</p>
         </div>
-        <div className="dashboard-actions newsroom-generate-actions">
-          <form action={generateNewsroomEditionAction}>
-            <input type="hidden" name="market" value="Eastern North Carolina" />
-            <input type="hidden" name="slot" value="morning" />
-            <button className="button button-secondary" type="submit"><Newspaper size={16} /> Generate morning</button>
-          </form>
-          <form action={generateNewsroomEditionAction}>
-            <input type="hidden" name="market" value="Eastern North Carolina" />
-            <input type="hidden" name="slot" value="afternoon" />
-            <button className="button button-primary" type="submit"><Radio size={16} /> Generate update</button>
-          </form>
-        </div>
+        <NewsroomGenerateControls />
       </section>
 
-      <section className="metrics-grid" aria-label="Newsroom status">
-        <article className="metric-card"><span className="metric-icon metric-icon-teal"><Play size={18} /></span><div><span>Latest on air</span><strong>{published?.label ?? "No edition"}</strong><small>{published ? shortDate(published.publishedAt) : "Generate the first edition"}</small></div></article>
-        <article className="metric-card"><span className="metric-icon metric-icon-coral"><CircleAlert size={18} /></span><div><span>Review queue</span><strong>{reviewStories.length}</strong><small>Sensitive stories remain off-air</small></div></article>
-        <article className="metric-card"><span className="metric-icon metric-icon-blue"><Clock3 size={18} /></span><div><span>Program length</span><strong>{published ? `${Math.floor(published.durationSeconds / 60)}:${String(published.durationSeconds % 60).padStart(2, "0")}` : "3–5 min"}</strong><small>Scheduled about once per hour</small></div></article>
-        <article className="metric-card"><span className="metric-icon metric-icon-gold"><ShieldCheck size={18} /></span><div><span>Approved sources</span><strong>{healthySources} / {sources.length}</strong><small>Official records prioritized</small></div></article>
+      <section className="metric-grid" aria-label="Newsroom status">
+        <article className="metric-card metric-card-teal"><div className="metric-heading"><span>Latest on air</span><span className="metric-icon"><Play size={18} /></span></div><strong className="metric-value newsroom-metric-value">{published?.label ?? "No edition"}</strong><p>{published ? shortDate(published.publishedAt) : "Generate the first edition"}</p></article>
+        <article className="metric-card metric-card-coral"><div className="metric-heading"><span>Review queue</span><span className="metric-icon"><CircleAlert size={18} /></span></div><strong className="metric-value">{reviewStories.length}</strong><p>Sensitive stories remain off-air</p></article>
+        <article className="metric-card metric-card-blue"><div className="metric-heading"><span>Program length</span><span className="metric-icon"><Clock3 size={18} /></span></div><strong className="metric-value">{published ? `${Math.floor(published.durationSeconds / 60)}:${String(published.durationSeconds % 60).padStart(2, "0")}` : "3–5 min"}</strong><p>Scheduled about once per hour</p></article>
+        <article className="metric-card metric-card-gold"><div className="metric-heading"><span>Approved sources</span><span className="metric-icon"><ShieldCheck size={18} /></span></div><strong className="metric-value">{healthySources} / {sources.length}</strong><p>Official records prioritized</p></article>
       </section>
 
       {reviewStories.length ? (

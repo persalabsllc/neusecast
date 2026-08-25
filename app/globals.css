@@ -4371,6 +4371,15 @@ a.contact-card:hover { border-color: rgba(67, 221, 193, 0.35); background: rgba(
 .newsroom-source-grid strong { font-size: 13px; }
 .newsroom-source-grid span { color: var(--muted); font-size: 10px; text-transform: capitalize; }
 .newsroom-source-grid a { display: inline-flex; align-items: center; gap: 5px; margin-top: 5px; color: var(--tide); font-size: 10px; font-weight: 700; }
+.newsroom-generation-control { display: grid; gap: 12px; min-width: min(100%, 520px); }
+.newsroom-generation-control .newsroom-generate-actions { width: 100%; }
+.newsroom-generation-message { max-width: 620px; padding: 12px 14px; border: 1px solid var(--line-strong); border-radius: 11px; color: var(--muted); background: rgba(5, 20, 24, .82); font-size: 12px; line-height: 1.5; }
+.newsroom-generation-message.is-working { display: flex; align-items: flex-start; gap: 10px; color: #c8dcda; border-color: rgba(67, 221, 193, .3); }
+.newsroom-generation-message.is-success { color: #bff4d0; border-color: rgba(92, 224, 134, .35); background: rgba(17, 62, 36, .38); }
+.newsroom-generation-message.is-error { color: #ffc2bd; border-color: rgba(255, 120, 104, .4); background: rgba(72, 24, 22, .4); }
+.newsroom-generation-spinner { width: 15px; aspect-ratio: 1; flex: 0 0 auto; margin-top: 2px; border: 2px solid rgba(67, 221, 193, .25); border-top-color: var(--tide); border-radius: 50%; animation: newsroom-control-spin .8s linear infinite; }
+.newsroom-metric-value { font-size: clamp(24px, 3vw, 42px); }
+@keyframes newsroom-control-spin { to { transform: rotate(360deg); } }
 
 @media (max-width: 980px) {
   .newsroom-review-grid { grid-template-columns: 1fr; }
@@ -4380,6 +4389,8 @@ a.contact-card:hover { border-color: rgba(67, 221, 193, 0.35); background: rgba(
   .newsroom-source-grid { grid-template-columns: 1fr; }
   .newsroom-edition-row { align-items: stretch; }
   .newsroom-edition-actions { justify-content: flex-start; }
+  .newsroom-generation-control,
+  .newsroom-generation-control .newsroom-generate-actions { width: 100%; }
 }
 
 .host-preview-panel {
