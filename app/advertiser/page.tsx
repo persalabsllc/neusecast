@@ -61,7 +61,7 @@ export default async function AdvertiserPage({ searchParams }: AdvertiserPagePro
         </section>
         <form className="advertiser-form-card" action={createAdvertiserAccount}>
           <div><span>Step 1 of 1</span><h2>Business details</h2></div>
-          {params.error ? <p className="form-error">Please enter a business name and valid billing email.</p> : null}
+          {params.error ? <p className="form-error">{params.error === "account-conflict" ? "This verified email is connected to another login. Sign out and use the original account, or contact NeuseCast for help." : "Please enter a business name and valid billing email."}</p> : null}
           <label className="field"><span className="field-label">Business name</span><input name="businessName" required autoComplete="organization" /></label>
           <label className="field"><span className="field-label">Billing email</span><input name="billingEmail" type="email" required defaultValue={email} autoComplete="email" /></label>
           <label className="field"><span className="field-label">Phone</span><input name="phone" type="tel" autoComplete="tel" /></label>
