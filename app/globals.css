@@ -6475,6 +6475,15 @@ a.contact-card:hover { border-color: rgba(67, 221, 193, 0.35); background: rgba(
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }
+
+  .player-weather-segment {
+    opacity: 0;
+    transform: none;
+  }
+
+  .player-weather-segment-current {
+    opacity: 1;
+  }
 }
 
 @media (max-aspect-ratio: 4 / 3) {
