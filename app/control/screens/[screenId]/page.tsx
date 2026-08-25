@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { eq } from "drizzle-orm";
-import { Activity, ArrowLeft, Clock3, KeyRound, Monitor, Radio, ShieldBan, TriangleAlert, Wifi } from "lucide-react";
+import { and, eq, inArray } from "drizzle-orm";
+import { Activity, ArrowLeft, Clock3, KeyRound, Monitor, Radio, ShieldBan, TriangleAlert, UserRoundCog, Wifi } from "lucide-react";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { ResetPlayerDeviceForm } from "@/components/reset-player-device-form";
@@ -13,7 +13,7 @@ import { deriveScreenHealth, type ScreenHealth } from "@/lib/player/health";
 import { pairingCookieName } from "@/lib/player/pairing";
 import { setScreenActive } from "../actions";
 import { createPlayerPairingLink, resetPlayerDevice } from "./device-actions";
-import { updateAdvertiserBlock } from "./actions";
+import { updateAdvertiserBlock, updateHostAssignment } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -66,7 +66,7 @@ function siteRoot() {
 
 export default async function ScreenDetailPage({ params, searchParams }: {
   params: Promise<{ screenId: string }>;
-  searchParams: Promise<{ created?: string; pairing?: string; reset?: string }>;
+  searchParams: Promise<{ created?: string; pairing?: string; reset?: string; hostUpdated?: string; hostError?: string }>;
 }) {
   const [{ screenId }, query] = await Promise.all([params, searchParams]);
   await ensureScreenManagementSchema();
@@ -112,9 +112,14 @@ export default async function ScreenDetailPage({ params, searchParams }: {
     .limit(1);
   if (!screen) notFound();
 
-  const [advertisers, blocks] = await Promise.all([
+  const [advertisers, blocks, hosts] = await Promise.all([
     database.select({ id: advertiserAccounts.id, businessName: advertiserAccounts.businessName }).from(advertiserAccounts).where(eq(advertiserAccounts.active, true)),
     database.select({ advertiserAccountId: screenAdvertiserBlocks.advertiserAccountId, reason: screenAdvertiserBlocks.reason }).from(screenAdvertiserBlocks).where(eq(screenAdvertiserBlocks.screenId, screenId)),
+    database
+      .select({ clerkUserId: appUsers.clerkUserId, displayName: appUsers.displayName, email: appUsers.email })
+      .from(appUsers)
+      .where(and(eq(appUsers.role, "host"), inArray(appUsers.status, ["active", "invited"])))
+      .orderBy(appUsers.displayName, appUsers.email),
   ]);
   const blocked = new Map(blocks.map((item) => [item.advertiserAccountId, item.reason]));
   const now = new Date();
@@ -137,7 +142,7 @@ export default async function ScreenDetailPage({ params, searchParams }: {
         <div><p className="eyebrow">Screen management</p><h1>{screen.venueName}</h1><p className="page-description">{screen.name} · {screen.city}, {screen.state} · {screen.market}</p></div>
         <span className={`status-badge status-${health} status-badge-large`}><span className="status-dot" />{healthLabels[health]}</span>
       </header>
-      {query.created || query.pairing || query.reset ? <div className="success-banner">{query.reset ? "Device pairing reset. Use the new one-time link below on the replacement player." : "One-time pairing link ready. Open it on the venue player before it expires."}</div> : null}
+      {query.hostUpdated ? <div className="success-banner">Host assignment updated. The new host can now manage this screen from the Host Workspace.</div> : query.created || query.pairing || query.reset ? <div className="success-banner">{query.reset ? "Device pairing reset. Use the new one-time link below on the replacement player." : "One-time pairing link ready. Open it on the venue player before it expires."}</div> : null}
       {screen.lastError ? <div className="screen-error-banner"><TriangleAlert size={18} /><div><strong>Player reported an error</strong><span>{screen.lastError}</span><small>{formatTimestamp(screen.lastErrorAt, screen.timeZone)}</small></div></div> : null}
 
       <section className="screen-telemetry-grid" aria-label="Screen telemetry">
@@ -164,6 +169,32 @@ export default async function ScreenDetailPage({ params, searchParams }: {
             <div><dt>Device ID</dt><dd>{shortVersion(screen.deviceId)}</dd></div>
             <div><dt>Device session</dt><dd>{shortVersion(screen.sessionId)}</dd></div>
           </dl>
+          <details className="screen-host-assignment" open={Boolean(query.hostError)}>
+            <summary><UserRoundCog size={17} /> Change host assignment</summary>
+            <form action={updateHostAssignment} className="screen-host-assignment-form">
+              <input type="hidden" name="screenId" value={screen.id} />
+              <p className="field-help field-wide">Choose an existing active host, or leave the list blank and enter a new host email. A new email reserves access until that person signs up.</p>
+              {query.hostError ? <p className="form-error field-wide">{query.hostError === "required" ? "Choose an existing host or enter a valid host email." : "That host account cannot be assigned. Choose another active host."}</p> : null}
+              <label className="field field-wide">
+                <span className="field-label">Existing host</span>
+                <select name="existingHostId" defaultValue={hosts.some((host) => host.clerkUserId === screen.hostClerkUserId) ? screen.hostClerkUserId ?? "" : ""}>
+                  <option value="">Enter a new host below</option>
+                  {hosts.map((host) => <option key={host.clerkUserId} value={host.clerkUserId}>{host.displayName || host.email} · {host.email}</option>)}
+                </select>
+              </label>
+              <label className="field">
+                <span className="field-label">New host name</span>
+                <input name="hostName" maxLength={160} autoComplete="name" placeholder="Venue contact" />
+              </label>
+              <label className="field">
+                <span className="field-label">New host email</span>
+                <input name="hostEmail" type="email" maxLength={320} autoComplete="email" placeholder="host@example.com" />
+              </label>
+              <div className="screen-host-assignment-actions field-wide">
+                <button className="button button-primary" type="submit">Update host</button>
+              </div>
+            </form>
+          </details>
           {playerUrl ? <>
             <p className="install-url-label"><Clock3 size={14} /> {screen.deviceClaimedAt ? "Permanent player URL" : pairingUrl ? "One-time pairing URL" : "Player pairing"}</p>
             {installUrl ? <code className="player-url">{installUrl}</code> : <p className="device-waiting-note">Generate a one-time link, then open it on the player attached to this venue TV.</p>}
