@@ -69,8 +69,9 @@ export type NewsroomGenerationResult = {
 
 const STORY_TARGET = 8;
 const MINIMUM_AIRABLE_STORIES = 4;
-const SENSITIVE_PATTERN = /\b(?:arrest|charged|citation|cited|shooting|fire|injur|killed|dead|death|missing|suspect|police|sheriff|crime|felony|misdemeanor|crash|collision|election|candidate|campaign)\b/iu;
-const CRITICAL_PATTERN = /\b(?:minor|child|juvenile|sexual|abuse|rape|murder|homicide|accusation|allegation|investigation into)\b/iu;
+const SENSITIVE_INCIDENT_PATTERN = /\b(?:was|were|has been|have been|is|are)\s+(?:arrested|charged|cited|injured|killed|reported missing)\b|\b(?:fatal|deadly|serious)\s+(?:crash|collision|fire|shooting)\b|\b(?:police|sheriff(?:'s)? office|authorities)\s+(?:are|is|continue to be)?\s*(?:investigating|searching|seeking)|\b(?:felony|misdemeanor)\s+charge(?:s)?\b/iu;
+const CRITICAL_PUBLIC_SAFETY_PATTERN = /\b(?:sexual assault|sexual abuse|rape|child abuse|homicide)\b|\b(?:murder|manslaughter)\s+charge(?:s|d)?\b|\b(?:minor|juvenile|child)\b.{0,80}\b(?:arrested|charged|victim|missing|abuse|assault)\b|\b(?:arrested|charged|victim|missing|abuse|assault)\b.{0,80}\b(?:minor|juvenile|child)\b|\b(?:accused|allegation|alleged)\s+(?:of|that)\b/iu;
+const SENSITIVE_COMMUNITY_PATTERN = /\b(?:died|death of|killed in|injured in|missing person|active investigation)\b|\b(?:alleged|accused of|allegation of)\s+(?:misconduct|fraud|corruption|abuse|harassment|crime|criminal conduct)\b/iu;
 
 function responseSchema() {
   return {
@@ -125,6 +126,18 @@ function cleanText(value: unknown, max: number) {
   return typeof value === "string" ? value.replace(/\s+/gu, " ").trim().slice(0, max) : "";
 }
 
+function cleanEditorialText(value: unknown, max: number) {
+  if (typeof value !== "string") return "";
+  return value
+    .replace(/\(\[[^\]]+\]\(https?:\/\/[^)]+\)\)/giu, "")
+    .replace(/\[([^\]]+)\]\(https?:\/\/[^)]+\)/giu, "$1")
+    .replace(/\s*\(https?:\/\/[^)]+\)/giu, "")
+    .replace(/https?:\/\/\S+/giu, "")
+    .replace(/\s+/gu, " ")
+    .trim()
+    .slice(0, max);
+}
+
 function responseText(response: OpenAIResponse) {
   return (response.output ?? [])
     .flatMap((item) => item.content ?? [])
@@ -170,11 +183,14 @@ function isCited(sourceUrl: string, citations: Set<string>) {
   });
 }
 
-function riskForStory(story: Pick<GeneratedStory, "category" | "headline" | "summary" | "narration" | "riskLevel">): NewsroomRiskLevel {
+function riskForStory(story: Pick<GeneratedStory, "category" | "headline" | "summary" | "narration">): NewsroomRiskLevel {
   const text = `${story.headline} ${story.summary} ${story.narration}`;
-  if (CRITICAL_PATTERN.test(text)) return "critical";
-  if (story.category === "public_safety" || story.category === "elections" || SENSITIVE_PATTERN.test(text)) return "sensitive";
-  return story.riskLevel;
+  if (story.category === "public_safety") {
+    return CRITICAL_PUBLIC_SAFETY_PATTERN.test(text) ? "critical" : "sensitive";
+  }
+  if (story.category === "elections" || story.category === "breaking") return "sensitive";
+  if (SENSITIVE_INCIDENT_PATTERN.test(text) || SENSITIVE_COMMUNITY_PATTERN.test(text)) return "sensitive";
+  return "low";
 }
 
 function parseStories(value: unknown, citations: Set<string>) {
@@ -189,10 +205,10 @@ function parseStories(value: unknown, citations: Set<string>) {
     const item = raw as Record<string, unknown>;
     const category = cleanText(item.category, 40) as NewsroomCategory;
     const sourceUrl = cleanText(item.sourceUrl, 2_000);
-    const headline = cleanText(item.headline, 180);
-    const summary = cleanText(item.summary, 420);
-    const narration = cleanText(item.narration, 850);
-    const ticker = cleanText(item.ticker, 300);
+    const headline = cleanEditorialText(item.headline, 180);
+    const summary = cleanEditorialText(item.summary, 420);
+    const narration = cleanEditorialText(item.narration, 850);
+    const ticker = cleanEditorialText(item.ticker, 300);
     const sourceName = cleanText(item.sourceName, 180);
     const visualTemplate = cleanText(item.visualTemplate, 40) as NewsroomVisualTemplate;
     if (
@@ -394,8 +410,9 @@ async function requestStories(market: string, slot: NewsroomSlot) {
         "Every story must use one directly supporting URL you actually consulted and that URL must appear in the web-search citations. Do not invent URLs, facts, quotations, vote totals, allegations, dates, arrests, charges, events, or weather.",
         "Never quote a person unless the exact quotation appears in the cited source. Prefer paraphrase. Never infer motive or guilt.",
         "For arrests or charges, use alleged/charged/arrested language, state that a charge is not a conviction in the narration, omit home addresses and mugshots, and classify the story sensitive. Exclude minors and sexual-offense details entirely.",
-        "Classify elections, candidate disputes, allegations, deaths, serious injuries, fires with victims, and named criminal accusations as sensitive or critical. These items require human review and must be written neutrally.",
-        "Use low risk only for routine government actions, meeting notices, school operations, roads, public weather, business openings, and community information without allegations or named criminal defendants.",
+        "Classify actual arrests, charges, active investigations, elections, candidate disputes, allegations, deaths, serious injuries, fires with victims, and named criminal accusations as sensitive or critical. These items require human review and must be written neutrally.",
+        "Use low risk for routine government actions, meeting notices, school operations, roads, public weather, business openings, festivals, performances, arts and entertainment, event postponements, and ordinary community information without a real-world safety incident or accusation. Never classify a fictional title, play, book, movie, song, festival name, or quoted work as sensitive merely because its title contains a crime-related word.",
+        "Do not place citations, Markdown links, source domains, URLs, or parenthetical source references inside the headline, summary, narration, or ticker. Attribution is displayed separately by the player.",
         "Keep the headline under 12 words. Summary is one or two on-screen sentences. Narration should be 55 to 90 words and understandable without audio because the summary will also be captioned. Ticker is one clean sentence.",
         "Select varied visual templates. Use map for location-driven stories, civic for meetings and votes, numbers for election or budget data, photo only for non-sensitive places with a commercially reusable image likely available, lead for the strongest story, and headline otherwise.",
         "Set artworkSearchQuery only for a real public place, government building, roadway, school exterior, landscape, or landmark. Never request a victim, suspect, arrest, mugshot, private residence, accident scene, or copyrighted news image.",
