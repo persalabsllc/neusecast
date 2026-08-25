@@ -12,6 +12,7 @@ import { NEUSECAST_PLAN } from "@/lib/pricing";
 import { getApplicationUrl, getStripe } from "@/lib/stripe";
 import { nextBroadcastMorning } from "@/lib/time-zone";
 import { ADVERTISING_TERMS_VERSION } from "@/lib/legal";
+import { reconcileVerifiedAppUser } from "@/lib/app-user-identity";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
@@ -65,6 +66,11 @@ export async function createAdvertiserAccount(formData: FormData) {
   }
 
   const database = getDatabase();
+  await reconcileVerifiedAppUser({
+    clerkUserId: user.id,
+    email,
+    displayName: user.fullName ?? businessName,
+  });
   const [[existingUser], [emailOwner]] = await Promise.all([
     database
       .select({ clerkUserId: appUsers.clerkUserId, status: appUsers.status })
