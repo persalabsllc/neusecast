@@ -210,7 +210,8 @@ export default async function HostProspectsPage({ searchParams }: {
         <details className="panel prospect-editor">
           <summary><FileUp size={18} /><span><strong>Import research batch</strong><small>Up to 60 verified JSON records; duplicates are skipped</small></span><ChevronDown size={17} /></summary>
           <form action={importHostProspectResearch} className="prospect-import-form">
-            <label className="field"><span className="field-label">Research JSON</span><textarea name="batch" required placeholder={'[{"businessName":"Example","venueType":"Waiting room","researchSourceUrl":"https://…","fitAngle":"Customers wait 30–60 minutes","email":"hello@example.com","emailVerified":true}]'} /></label>
+            <label className="field"><span className="field-label">Research JSON file</span><input name="batchFile" type="file" accept=".json,application/json" /><small className="field-help">Upload the private NeuseCast prospect file directly.</small></label>
+            <label className="field"><span className="field-label">Or paste research JSON</span><textarea name="batch" placeholder={'[{"businessName":"Example","venueType":"Waiting room","researchSourceUrl":"https://…","fitAngle":"Customers wait 30–60 minutes","email":"hello@example.com","emailVerified":true}]'} /></label>
             <p>Required per row: businessName, venueType, researchSourceUrl, and fitAngle. Public email addresses are accepted only when <code>emailVerified</code> is true.</p>
             <button className="button button-secondary" type="submit"><FileUp size={17} /> Validate and import</button>
           </form>
