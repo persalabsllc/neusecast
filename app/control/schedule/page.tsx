@@ -10,6 +10,7 @@ import {
   creatives,
   generatedContent,
   hostContent,
+  newsroomEditions,
   playerManifestSnapshots,
   screens,
   venues,
@@ -72,7 +73,7 @@ function shortVersion(version: string | null) {
 export default async function SchedulePage() {
   await ensureScreenManagementSchema();
   const db = getDatabase();
-  const [screenRows, campaignRows, creativeRows, hostRows, fillerRows, snapshotRows] = await Promise.all([
+  const [screenRows, campaignRows, creativeRows, hostRows, fillerRows, newsroomRows, snapshotRows] = await Promise.all([
     db
       .select({
         id: screens.id,
@@ -147,6 +148,19 @@ export default async function SchedulePage() {
       .from(generatedContent)
       .orderBy(desc(generatedContent.updatedAt)),
     db
+      .select({
+        id: newsroomEditions.id,
+        label: newsroomEditions.label,
+        headline: newsroomEditions.headline,
+        status: newsroomEditions.status,
+        market: newsroomEditions.market,
+        scheduledAt: newsroomEditions.scheduledAt,
+        expiresAt: newsroomEditions.expiresAt,
+        revision: newsroomEditions.revision,
+      })
+      .from(newsroomEditions)
+      .orderBy(desc(newsroomEditions.updatedAt)),
+    db
       .selectDistinctOn([playerManifestSnapshots.screenId], {
         screenId: playerManifestSnapshots.screenId,
         items: playerManifestSnapshots.items,
@@ -179,6 +193,9 @@ export default async function SchedulePage() {
     row.approved
     && (!row.expiresAt || row.expiresAt.getTime() >= now.getTime())
   ));
+  const scheduledNewsroom = newsroomRows.filter((row) => (
+    row.status === "published" && row.expiresAt.getTime() >= now.getTime()
+  ));
   const activeScreens = screenRows
     .filter((row) => row.active && row.status !== "retired")
     .map((row) => ({ ...row, health: deriveScreenHealth(row, now) }));
@@ -187,6 +204,7 @@ export default async function SchedulePage() {
     ...creativeRows.map((row) => [row.id, row.headline || row.name] as const),
     ...hostRows.map((row) => [row.id, row.headline] as const),
     ...fillerRows.map((row) => [row.id, row.title] as const),
+    ...newsroomRows.map((row) => [`newsroom-${row.id}-r${row.revision}`, `${row.label}: ${row.headline}`] as const),
   ]);
   const snapshotByScreen = new Map(snapshotRows.map((row) => [row.screenId, row]));
 
@@ -213,6 +231,7 @@ export default async function SchedulePage() {
           <li><span className="check-dot" /><strong>Paid advertiser campaign:</strong>&nbsp; starts the next day, network-wide, only after admin creative approval.</li>
           <li><span className="check-dot" /><strong>Host content:</strong>&nbsp; publishes immediately or at the host’s chosen time, only to their assigned screen.</li>
           <li><span className="check-dot" /><strong>Network filler:</strong>&nbsp; approved manual and sourced automatic cards mix between host posts; the NeuseCast house promotion remains in every loop.</li>
+          <li><span className="check-dot" /><strong>NeuseCast Newsroom:</strong>&nbsp; the current 3–5 minute edition is offered about once per hour; sensitive stories require approval before they enter the broadcast package.</li>
           <li><span className="check-dot" /><strong>Venue blocking:</strong>&nbsp; advertiser blocks are applied independently for each screen.</li>
           <li><span className="check-dot" /><strong>Player URL:</strong>&nbsp; each screen has its own addressable manifest and display URL.</li>
         </ul>
@@ -237,7 +256,8 @@ export default async function SchedulePage() {
           })}
           {scheduledHost.map((item) => <article className="content-row" key={item.id}><span className="metric-icon metric-icon-teal"><MonitorPlay size={18} /></span><div className="content-main"><div className="content-title-line"><h2>{item.headline}</h2><span className={`status-badge status-${item.status === "approved" ? "active" : item.status}`}>{item.status}</span></div><p>{item.venue}{item.screen ? ` · ${item.screen}` : ""} · venue-only</p><div className="metadata-row"><span>{formatWindow(item.startsAt, item.endsAt, item.timeZone)}</span></div></div></article>)}
           {scheduledFiller.map((item) => <article className="content-row" key={item.id}><span className="metric-icon metric-icon-blue"><Sparkles size={18} /></span><div className="content-main"><div className="content-title-line"><h2>{item.title}</h2><span className="status-badge status-active">Filler enabled</span></div><p>{item.market || "Every market"}</p><div className="metadata-row"><span>{formatWindow(item.startsAt, item.expiresAt, CONTROL_TIME_ZONE)}</span></div></div></article>)}
-          {!scheduledCampaigns.length && !scheduledHost.length && !scheduledFiller.length ? <div className="empty-state"><h3>No scheduled content yet</h3><p>Approved advertiser, host, and filler windows will appear here.</p></div> : null}
+          {scheduledNewsroom.map((item) => <article className="content-row" key={item.id}><span className="metric-icon metric-icon-coral"><CalendarClock size={18} /></span><div className="content-main"><div className="content-title-line"><h2>{item.label} · {item.headline}</h2><span className="status-badge status-active">Newsroom on air</span></div><p>{item.market} · approximately once per hour</p><div className="metadata-row"><span>{formatWindow(item.scheduledAt, item.expiresAt, CONTROL_TIME_ZONE)}</span></div></div><Link className="button button-secondary" href={`/control/newsroom/${item.id}`} target="_blank">Preview</Link></article>)}
+          {!scheduledCampaigns.length && !scheduledHost.length && !scheduledFiller.length && !scheduledNewsroom.length ? <div className="empty-state"><h3>No scheduled content yet</h3><p>Approved advertiser, host, filler, and newsroom windows will appear here.</p></div> : null}
         </div>
       </section>
 

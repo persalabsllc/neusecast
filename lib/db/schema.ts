@@ -38,6 +38,9 @@ export const creativeStatus = pgEnum("creative_status", ["draft", "processing", 
 export const creativeType = pgEnum("creative_type", ["image", "video", "generated_slide"]);
 export const orderStatus = pgEnum("order_status", ["pending", "paid", "failed", "refunded", "cancelled"]);
 export const hostContentStatus = pgEnum("host_content_status", ["draft", "submitted", "approved", "scheduled", "expired", "rejected"]);
+export const newsroomStoryStatus = pgEnum("newsroom_story_status", ["review", "approved", "rejected", "killed"]);
+export const newsroomEditionStatus = pgEnum("newsroom_edition_status", ["draft", "review", "published", "withdrawn", "failed"]);
+export const newsroomRiskLevel = pgEnum("newsroom_risk_level", ["low", "sensitive", "critical"]);
 
 export const appUsers = pgTable(
   "app_users",
@@ -152,7 +155,7 @@ export const playerManifestSnapshots = pgTable(
     version: varchar("version", { length: 64 }).notNull(),
     items: jsonb("items").$type<Array<{
       id: string;
-      source: "creative" | "host_content" | "generated_content";
+      source: "creative" | "host_content" | "generated_content" | "newsroom";
       campaignId: string | null;
       creativeId: string | null;
       durationSeconds: number;
@@ -364,4 +367,116 @@ export const generatedContent = pgTable(
     ...timestamps,
   },
   (table) => [index("generated_content_market_idx").on(table.market, table.category)],
+);
+
+export type NewsroomStoryPackage = {
+  id: string;
+  category: string;
+  headline: string;
+  summary: string;
+  narration: string;
+  ticker: string;
+  sourceName: string;
+  sourceUrl: string;
+  sourcePublishedAt: string | null;
+  locationLabel: string | null;
+  imageUrl: string | null;
+  imageCredit: string | null;
+  imageSourceUrl: string | null;
+  riskLevel: "low" | "sensitive" | "critical";
+  durationSeconds: number;
+  visualTemplate: string;
+};
+
+export const newsroomSources = pgTable(
+  "newsroom_sources",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: varchar("name", { length: 180 }).notNull(),
+    homepageUrl: text("homepage_url").notNull(),
+    sourceType: varchar("source_type", { length: 40 }).notNull(),
+    trustTier: varchar("trust_tier", { length: 40 }).notNull(),
+    market: varchar("market", { length: 100 }),
+    active: boolean("active").default(true).notNull(),
+    attributionLabel: varchar("attribution_label", { length: 180 }).notNull(),
+    mediaPolicy: varchar("media_policy", { length: 80 }).default("facts_only").notNull(),
+    lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
+    lastSuccessAt: timestamp("last_success_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("newsroom_sources_homepage_idx").on(table.homepageUrl),
+    index("newsroom_sources_market_idx").on(table.market, table.active),
+  ],
+);
+
+export const newsroomEditions = pgTable(
+  "newsroom_editions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    market: varchar("market", { length: 100 }).notNull(),
+    slot: varchar("slot", { length: 24 }).notNull(),
+    label: varchar("label", { length: 120 }).notNull(),
+    headline: varchar("headline", { length: 180 }).notNull(),
+    status: newsroomEditionStatus("status").default("draft").notNull(),
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }).notNull(),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    durationSeconds: integer("duration_seconds").default(180).notNull(),
+    stories: jsonb("stories").$type<NewsroomStoryPackage[]>().default([]).notNull(),
+    script: text("script"),
+    ticker: text("ticker"),
+    videoUrl: text("video_url"),
+    posterUrl: text("poster_url"),
+    revision: integer("revision").default(1).notNull(),
+    sourceHash: varchar("source_hash", { length: 64 }),
+    generatedBy: varchar("generated_by", { length: 80 }).default("openai_web_search").notNull(),
+    approvedByClerkUserId: text("approved_by_clerk_user_id").references(() => appUsers.clerkUserId, { onDelete: "set null" }),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
+    ...timestamps,
+  },
+  (table) => [
+    index("newsroom_editions_air_idx").on(table.market, table.status, table.publishedAt, table.expiresAt),
+    index("newsroom_editions_slot_idx").on(table.market, table.slot, table.scheduledAt),
+  ],
+);
+
+export const newsroomStories = pgTable(
+  "newsroom_stories",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    editionId: uuid("edition_id")
+      .notNull()
+      .references(() => newsroomEditions.id, { onDelete: "cascade" }),
+    sourceId: uuid("source_id").references(() => newsroomSources.id, { onDelete: "set null" }),
+    market: varchar("market", { length: 100 }).notNull(),
+    category: varchar("category", { length: 40 }).notNull(),
+    headline: varchar("headline", { length: 180 }).notNull(),
+    summary: text("summary").notNull(),
+    narration: text("narration").notNull(),
+    ticker: varchar("ticker", { length: 300 }).notNull(),
+    sourceName: varchar("source_name", { length: 180 }).notNull(),
+    sourceUrl: text("source_url").notNull(),
+    sourcePublishedAt: timestamp("source_published_at", { withTimezone: true }),
+    locationLabel: varchar("location_label", { length: 120 }),
+    imageUrl: text("image_url"),
+    imageCredit: varchar("image_credit", { length: 240 }),
+    imageSourceUrl: text("image_source_url"),
+    riskLevel: newsroomRiskLevel("risk_level").default("low").notNull(),
+    status: newsroomStoryStatus("status").default("review").notNull(),
+    durationSeconds: integer("duration_seconds").default(26).notNull(),
+    visualTemplate: varchar("visual_template", { length: 40 }).default("headline").notNull(),
+    fingerprint: varchar("fingerprint", { length: 64 }).notNull(),
+    reviewedByClerkUserId: text("reviewed_by_clerk_user_id").references(() => appUsers.clerkUserId, { onDelete: "set null" }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
+    ...timestamps,
+  },
+  (table) => [
+    index("newsroom_stories_edition_idx").on(table.editionId, table.status),
+    index("newsroom_stories_review_idx").on(table.status, table.riskLevel, table.createdAt),
+    index("newsroom_stories_fingerprint_idx").on(table.fingerprint),
+  ],
 );

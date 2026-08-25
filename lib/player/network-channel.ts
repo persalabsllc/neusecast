@@ -17,6 +17,7 @@ import { interleaveRotation } from "./playlist";
 import { getRegionalAlerts, getRegionalForecast, regionalWeatherItem } from "./weather";
 import { insertNetworkIdents } from "./idents";
 import type { PlayerItem, PlayerItemKind, PlayerManifest, PlayerTheme } from "./types";
+import { latestPublishedNewsroomEdition, newsroomItemFromEdition } from "@/lib/newsroom/scheduling";
 
 const THEMES = new Set<PlayerTheme>(["aqua", "navy", "coral", "gold", "blue", "green"]);
 const KINDS = new Set<PlayerItemKind>(["advertisement", "host", "weather", "news", "event", "history", "trivia", "community", "ident"]);
@@ -51,7 +52,7 @@ export async function getNetworkChannelManifest(): Promise<PlayerManifest> {
   const database = getDatabase();
   const now = new Date();
 
-  const [creativeRows, generatedRows, regionalForecast, regionalAlerts] = await Promise.all([
+  const [creativeRows, generatedRows, regionalForecast, regionalAlerts, newsroomEdition] = await Promise.all([
     database
       .selectDistinct({
         id: creatives.id,
@@ -103,6 +104,7 @@ export async function getNetworkChannelManifest(): Promise<PlayerManifest> {
       console.error("NeuseCast Watch could not refresh regional NWS alerts", error);
       return [];
     }),
+    latestPublishedNewsroomEdition("Eastern North Carolina", now, { networkFallback: true }),
   ]);
 
   const advertisements: PlayerItem[] = creativeRows.map((row) => ({
@@ -151,10 +153,13 @@ export async function getNetworkChannelManifest(): Promise<PlayerManifest> {
   if (regionalForecast) fillerItems.unshift(regionalWeatherItem(regionalForecast));
 
   // Venue-specific host posts are deliberately excluded from the public channel.
-  const items = insertNetworkIdents(
+  const baseItems = insertNetworkIdents(
     interleaveRotation(advertisements, [], fillerItems),
     "network-live",
   );
+  const items = newsroomEdition
+    ? [...baseItems.slice(0, Math.min(2, baseItems.length)), newsroomItemFromEdition(newsroomEdition), ...baseItems.slice(Math.min(2, baseItems.length))]
+    : baseItems;
   const version = createHash("sha256")
     .update(JSON.stringify({ alerts: regionalAlerts, items }))
     .digest("hex")

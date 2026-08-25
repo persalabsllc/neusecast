@@ -21,6 +21,12 @@ import { NEUSECAST_HOUSE_AD } from "./house-ad";
 import { broadcastDayWindow } from "@/lib/time-zone";
 import { getRegionalAlerts, getRegionalForecast, regionalWeatherItem } from "./weather";
 import { insertNetworkIdents } from "./idents";
+import {
+  insertNewsroomAfterCurrent,
+  latestPublishedNewsroomEdition,
+  newsroomItemFromEdition,
+  newsroomMinimumGapMinutes,
+} from "@/lib/newsroom/scheduling";
 
 const THEMES = new Set<PlayerTheme>(["aqua", "navy", "coral", "gold", "blue", "green"]);
 const KINDS = new Set<PlayerItemKind>(["advertisement", "host", "weather", "news", "event", "history", "trivia", "community", "ident"]);
@@ -127,6 +133,7 @@ export async function getPlayerManifest(
       state: venues.state,
       market: venues.market,
       timeZone: venues.timeZone,
+      currentItemId: screens.currentItemId,
     })
     .from(screens)
     .innerJoin(venues, eq(screens.venueId, venues.id))
@@ -141,7 +148,8 @@ export async function getPlayerManifest(
 
   const broadcastDay = broadcastDayWindow(now, screen.timeZone);
 
-  const [creativeRows, hostRows, generatedRows, blockedRows, playbackRows, recentFillerPlaybackRows, regionalForecast, regionalAlerts] = await Promise.all([
+  const newsroomGapMinutes = newsroomMinimumGapMinutes();
+  const [creativeRows, hostRows, generatedRows, blockedRows, playbackRows, recentFillerPlaybackRows, regionalForecast, regionalAlerts, newsroomEdition] = await Promise.all([
     database
       .selectDistinct({
         id: creatives.id,
@@ -240,11 +248,12 @@ export async function getPlayerManifest(
       .from(playbackEvents)
       .where(and(
         eq(playbackEvents.screenId, screen.id),
-        gte(playbackEvents.playedAt, new Date(now.getTime() - 90 * 60 * 1_000)),
+        gte(playbackEvents.playedAt, new Date(now.getTime() - Math.max(90, newsroomGapMinutes) * 60 * 1_000)),
         lte(playbackEvents.playedAt, now),
       )),
     regionalForecastPromise,
     regionalAlertsPromise,
+    latestPublishedNewsroomEdition(screen.market, now, { networkFallback: true }),
   ]);
 
   const blockedAdvertisers = new Set(blockedRows.map((row) => row.advertiserAccountId));
@@ -340,9 +349,19 @@ export async function getPlayerManifest(
   }));
   if (regionalForecast) fillerItems.unshift(regionalWeatherItem(regionalForecast));
 
-  const items = insertNetworkIdents(
+  const baseItems = insertNetworkIdents(
     interleaveRotation(advertisements, hostItems, fillerItems),
     `screen:${screen.id}`,
+  );
+  const newsroomPlayedRecently = recentFillerPlaybackRows.some((row) => (
+    row.metadata?.source === "newsroom"
+    && typeof row.metadata.receivedAt === "string"
+    && now.getTime() - Date.parse(row.metadata.receivedAt) < newsroomGapMinutes * 60 * 1_000
+  ));
+  const items = insertNewsroomAfterCurrent(
+    baseItems,
+    newsroomEdition && !newsroomPlayedRecently ? newsroomItemFromEdition(newsroomEdition) : null,
+    screen.currentItemId,
   );
   const version = createHash("sha256")
     .update(JSON.stringify({

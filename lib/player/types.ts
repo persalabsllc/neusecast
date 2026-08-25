@@ -31,10 +31,39 @@ export type PlayerAlert = {
   expiresAt: string | null;
 };
 
+export type PlayerNewsroomStory = {
+  id: string;
+  category: string;
+  headline: string;
+  summary: string;
+  narration: string;
+  ticker: string;
+  sourceName: string;
+  sourceUrl: string;
+  sourcePublishedAt: string | null;
+  locationLabel: string | null;
+  imageUrl: string | null;
+  imageCredit: string | null;
+  riskLevel: "low" | "sensitive" | "critical";
+  durationSeconds: number;
+  visualTemplate: string;
+};
+
+export type PlayerNewsroomEdition = {
+  id: string;
+  label: string;
+  updatedAt: string;
+  ticker: string;
+  videoUrl: string | null;
+  posterUrl: string | null;
+  revision: number;
+  stories: PlayerNewsroomStory[];
+};
+
 export type PlayerItem = {
   id: string;
   kind: PlayerItemKind;
-  source: "creative" | "host_content" | "generated_content";
+  source: "creative" | "host_content" | "generated_content" | "newsroom";
   campaignId: string | null;
   creativeId: string | null;
   durationSeconds: number;
@@ -51,6 +80,7 @@ export type PlayerItem = {
   locationLabel?: string | null;
   weatherPeriods?: PlayerWeatherPeriod[];
   weatherLocations?: PlayerWeatherLocation[];
+  newsroomEdition?: PlayerNewsroomEdition | null;
   expiresAt?: string | null;
 };
 

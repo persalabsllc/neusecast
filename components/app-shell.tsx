@@ -13,6 +13,7 @@ import {
   Menu,
   Megaphone,
   MonitorPlay,
+  Newspaper,
   RadioTower,
   X,
 } from "lucide-react";
@@ -22,6 +23,7 @@ const primaryNavigation = [
   { label: "Dashboard", href: "/control", icon: LayoutDashboard },
   { label: "Screens", href: "/control/screens", icon: MonitorPlay },
   { label: "Content", href: "/control/content", icon: FolderOpen },
+  { label: "Newsroom", href: "/control/newsroom", icon: Newspaper },
   { label: "Campaigns", href: "/control/campaigns", icon: Megaphone },
   { label: "Schedule", href: "/control/schedule", icon: CalendarClock },
 ] as const;
@@ -30,6 +32,7 @@ const pageTitles: Record<string, { eyebrow: string; title: string }> = {
   "/control": { eyebrow: "Network overview", title: "Control Room" },
   "/control/screens": { eyebrow: "Network operations", title: "Screens" },
   "/control/content": { eyebrow: "Creative library", title: "Content" },
+  "/control/newsroom": { eyebrow: "Hyperlocal programming", title: "Newsroom" },
   "/control/campaigns": { eyebrow: "Sales & delivery", title: "Campaigns" },
   "/control/schedule": { eyebrow: "Programming", title: "Schedule" },
 };

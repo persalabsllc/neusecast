@@ -22,6 +22,7 @@ import {
   Wind,
 } from "lucide-react";
 import type { PlayerItem, PlayerManifest } from "@/lib/player/types";
+import { NewsroomBroadcast } from "@/components/newsroom-broadcast";
 
 const kindLabels: Record<PlayerItem["kind"], string> = {
   advertisement: "Local business",
@@ -45,6 +46,7 @@ const EVERGREEN_FILLER_CATEGORIES = new Set([
   "river_and_coast",
 ]);
 const EVERGREEN_REPLAY_GAP_MS = 90 * 60 * 1_000;
+const NEWSROOM_REPLAY_GAP_MS = 55 * 60 * 1_000;
 
 function isEvergreenFiller(item: PlayerItem) {
   return item.source === "generated_content"
@@ -578,6 +580,7 @@ export function PlayerRuntime({
   const flushingPlayback = useRef(false);
   const refreshingManifest = useRef(false);
   const recentEvergreenPlaysRef = useRef(new Map<string, number>());
+  const lastNewsroomPlayRef = useRef(0);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const playableItems = useMemo(() => manifest.items.filter((item) => {
     if (
@@ -595,6 +598,7 @@ export function PlayerRuntime({
   const displayedIndex = activeIndex < playableItems.length ? activeIndex : 0;
   const currentItem = playableItems[displayedIndex] ?? null;
   const isNews = currentItem?.kind === "news";
+  const isNewsroom = Boolean(currentItem?.source === "newsroom" && currentItem.newsroomEdition);
   const isWeather = currentItem?.kind === "weather";
   const isIdent = currentItem?.kind === "ident";
   const hasMedia = Boolean(currentItem?.mediaUrl);
@@ -1000,6 +1004,7 @@ export function PlayerRuntime({
         if (completedAt - playedAt >= EVERGREEN_REPLAY_GAP_MS) recentEvergreenPlays.delete(itemId);
       }
       if (isEvergreenFiller(currentItem)) recentEvergreenPlays.set(currentItem.id, completedAt);
+      if (currentItem.source === "newsroom") lastNewsroomPlayRef.current = completedAt;
 
       const currentPlayableItems = playableItemsRef.current;
       if (currentPlayableItems.length === 0) {
@@ -1011,7 +1016,12 @@ export function PlayerRuntime({
         const candidateIndex = (displayedIndex + 1 + offset) % currentPlayableItems.length;
         const candidate = currentPlayableItems[candidateIndex];
         const lastPlayedAt = recentEvergreenPlays.get(candidate.id);
-        if (!isEvergreenFiller(candidate) || !lastPlayedAt || completedAt - lastPlayedAt >= EVERGREEN_REPLAY_GAP_MS) {
+        const newsroomBlocked = candidate.source === "newsroom"
+          && completedAt - lastNewsroomPlayRef.current < NEWSROOM_REPLAY_GAP_MS;
+        if (
+          !newsroomBlocked
+          && (!isEvergreenFiller(candidate) || !lastPlayedAt || completedAt - lastPlayedAt >= EVERGREEN_REPLAY_GAP_MS)
+        ) {
           nextIndex = candidateIndex;
           break;
         }
@@ -1061,7 +1071,7 @@ export function PlayerRuntime({
   return (
     <div ref={stageRef} className={`player-viewport${embedded ? " player-viewport-embedded" : ""}`}>
       <main
-        className={`player-stage player-theme-${currentItem.theme} player-kind-${currentItem.kind} player-template-${visualTemplate}${hasMedia ? " player-has-media" : ""}${isEditorialPhoto ? " player-editorial-photo" : ""}${activeAlerts.length ? " player-has-alert" : ""}${embedded ? " player-embedded" : ""}`}
+        className={`player-stage player-theme-${currentItem.theme} player-kind-${currentItem.kind} player-template-${visualTemplate}${hasMedia ? " player-has-media" : ""}${isEditorialPhoto ? " player-editorial-photo" : ""}${isNewsroom ? " player-newsroom-package" : ""}${activeAlerts.length ? " player-has-alert" : ""}${embedded ? " player-embedded" : ""}`}
         style={playerStyle}
       >
       <div className="player-orbit player-orbit-one" aria-hidden="true" />
@@ -1085,7 +1095,13 @@ export function PlayerRuntime({
       </header>
 
       <section className={`player-slide player-slide-${currentItem.kind}`} key={currentItem.id}>
-        {isIdent ? (
+        {isNewsroom && currentItem.newsroomEdition ? (
+          <NewsroomBroadcast
+            edition={currentItem.newsroomEdition}
+            durationSeconds={currentItem.durationSeconds}
+            location={currentItem.locationLabel ?? "Eastern North Carolina"}
+          />
+        ) : isIdent ? (
           <NetworkIdent variant={currentItem.contentCategory} />
         ) : isWeather ? (
           <WeatherBroadcast item={currentItem} location="Eastern North Carolina" />
@@ -1123,7 +1139,7 @@ export function PlayerRuntime({
           </>
         )}
 
-        {isNews ? (
+        {isNews && !isNewsroom ? (
           <div className="player-news-ticker" aria-hidden="true">
             <strong>LOCAL UPDATE</strong>
             <div>
