@@ -46,6 +46,9 @@ type OpenAIResponse = {
   error?: { message?: string };
 };
 
+const SENSITIVE_NEWS_ARTWORK_PATTERN = /\b(?:arrest(?:ed)?|charg(?:e|ed)|victim|injur(?:y|ed)|kill(?:ed)?|died|death|dead|fatal|missing person|shooting|crash|collision|fire|investigat(?:e|ed|ing|ion)|alleg(?:e|ed|ation)|accus(?:e|ed|ation)|assault|abuse|homicide|murder|manslaughter|mugshot|private residence)\b/iu;
+const ARTWORK_WORKER_LIMIT = 4;
+
 export type FillerGenerationResult = {
   markets: number;
   created: number;
@@ -145,6 +148,36 @@ function isCited(sourceUrl: string, citations: Set<string>) {
   const comparable = comparableUrl(sourceUrl);
   if (!comparable) return false;
   return [...citations].some((citation) => comparableUrl(citation) === comparable);
+}
+
+function locationArtworkQuery(item: GeneratedFillerItem, market: string) {
+  const location = item.locationLabel?.trim();
+  if (!location) return null;
+  const regionalLabel = /north carolina/iu.test(market) ? market : `${market} North Carolina`;
+  return location.toLowerCase().includes(market.toLowerCase())
+    ? `${location} North Carolina`
+    : `${location} ${regionalLabel}`;
+}
+
+async function attachArtwork(items: GeneratedFillerItem[], market: string) {
+  const resolved = items.map((item) => ({ ...item }));
+  let nextIndex = 0;
+  await Promise.all(Array.from({ length: Math.min(ARTWORK_WORKER_LIMIT, resolved.length) }, async () => {
+    while (nextIndex < resolved.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      const item = resolved[index];
+      if (item.category === "news" && SENSITIVE_NEWS_ARTWORK_PATTERN.test(`${item.title} ${item.body}`)) continue;
+      const locationQuery = locationArtworkQuery(item, market);
+      const primaryQuery = item.artworkSearchQuery ?? locationQuery;
+      if (!primaryQuery) continue;
+      item.artwork = await findEditorialArtwork(
+        primaryQuery,
+        locationQuery && locationQuery.toLowerCase() !== primaryQuery.toLowerCase() ? [locationQuery] : [],
+      );
+    }
+  }));
+  return resolved;
 }
 
 function validateItems(
@@ -316,7 +349,8 @@ async function requestMarketBatch(
         "Prefer official government, museum, library, tourism, weather, venue, and established local-news sources.",
         "Do not invent events, dates, weather, statistics, quotations, businesses, or URLs.",
         "For an event, use one occurring within the next 14 days and set validUntil to its end time as ISO 8601 with a numeric timezone offset. Set validUntil to null for every other category.",
-        "For place_spotlight, did_you_know, history, then_and_now, river_and_coast, fact, and on_this_day, provide a short artworkSearchQuery naming the exact real place, person, object, or event the photograph should depict. Include New Bern, Craven County, or North Carolina in the query when it improves accuracy.",
+        "For every item, make a serious attempt to provide a short artworkSearchQuery for an exact real public place, public building, landmark, landscape, historical artifact, or publicly displayed object directly connected to the card. Use the actual event venue for community events. Include New Bern, Craven County, or North Carolina when it improves accuracy. Set it to null only when no honest, non-misleading visual subject exists.",
+        "For news involving a death, injury, arrest, charge, victim, missing person, crash, shooting, private residence, or active investigation, always set artworkSearchQuery to null. Never request a mugshot, victim, suspect, accident scene, private person, private home, publisher photo, logo, poster, or copyrighted news image.",
         "Choose visualTemplate from editorial_split, photo_feature, place_card, archival, and fact_reveal. Use place_card for recognizable destinations, archival for historical subjects, photo_feature for scenic places, fact_reveal for surprising facts, and editorial_split otherwise.",
         "Set locationLabel to the specific city, landmark, river, neighborhood, or county when relevant, otherwise null.",
         "Avoid generic national trivia. Favor New Bern first, then Craven County, the Neuse and Trent rivers, and the surrounding Eastern North Carolina region.",
@@ -351,12 +385,7 @@ async function requestMarketBatch(
     throw new Error("OpenAI returned filler content that could not be parsed.");
   }
   const items = validateItems(parsed, citedUrls(payload), categories, itemsPerCategory);
-  return Promise.all(items.map(async (item) => ({
-    ...item,
-    artwork: item.artworkSearchQuery
-      ? await findEditorialArtwork(item.artworkSearchQuery).catch(() => null)
-      : null,
-  })));
+  return attachArtwork(items, market);
 }
 
 async function saveMarketBatch(market: string, items: GeneratedFillerItem[]) {

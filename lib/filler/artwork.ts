@@ -31,6 +31,9 @@ type CommonsResponse = {
   };
 };
 
+const MAX_ARTWORK_QUERIES = 2;
+const DOCUMENT_SCAN_PATTERN = /\b(?:census|city directory|environmental statement|meeting minutes|proceedings|registered motor vehicle|report to the public|statutes at large)\b|\bpage\s+\d+\b|\.(?:djvu|pdf|tiff?)(?:\b|$)/iu;
+
 function cleanText(value: unknown, max: number) {
   if (typeof value !== "string") return "";
   return value
@@ -48,18 +51,27 @@ function isCommerciallyReusableLicense(value: string) {
     && !/(?:-nc|-nd)/iu.test(value);
 }
 
-export async function findEditorialArtwork(searchQuery: string): Promise<EditorialArtwork | null> {
-  const query = cleanText(searchQuery, 120);
-  if (!query) return null;
+function artworkQueries(searchQuery: string, fallbackQueries: readonly string[]) {
+  const queries = [searchQuery, ...fallbackQueries]
+    .map((query) => cleanText(query, 120))
+    .filter(Boolean);
+  return [...new Map(queries.map((query) => [query.toLowerCase(), query])).values()]
+    .slice(0, MAX_ARTWORK_QUERIES);
+}
+
+async function searchCommonsArtwork(query: string): Promise<EditorialArtwork | null> {
   const endpoint = new URL("https://commons.wikimedia.org/w/api.php");
   endpoint.search = new URLSearchParams({
     action: "query",
     format: "json",
     origin: "*",
     generator: "search",
-    gsrsearch: query,
+    // Restrict the search itself to raster artwork. Without this filter,
+    // Commons frequently ranks report covers, directories, and PDF scans ahead
+    // of the actual landmark or location the card is describing.
+    gsrsearch: `${query} filetype:bitmap`,
     gsrnamespace: "6",
-    gsrlimit: "8",
+    gsrlimit: "24",
     prop: "imageinfo",
     iiprop: "url|size|extmetadata",
     iiurlwidth: "1600",
@@ -80,7 +92,8 @@ export async function findEditorialArtwork(searchQuery: string): Promise<Editori
       const termScore = [...queryTerms].filter((term) => title.includes(term)).length * 10;
       const landscapeScore = (info?.width ?? 0) >= (info?.height ?? Number.POSITIVE_INFINITY) ? 4 : 0;
       const resolutionScore = (info?.width ?? 0) >= 1_200 ? 2 : 0;
-      return termScore + landscapeScore + resolutionScore;
+      const documentPenalty = DOCUMENT_SCAN_PATTERN.test(page.title ?? "") ? 100 : 0;
+      return termScore + landscapeScore + resolutionScore - documentPenalty;
     };
     return score(right) - score(left);
   });
@@ -93,10 +106,17 @@ export async function findEditorialArtwork(searchQuery: string): Promise<Editori
       !url.startsWith("https://")
       || !sourceUrl.startsWith("https://")
       || !isCommerciallyReusableLicense(license)
-      || /\.(?:svg|gif)(?:\?|$)/iu.test(url)
+      || DOCUMENT_SCAN_PATTERN.test(page.title ?? "")
+      || /\.(?:svg|gif|pdf|djvu|tiff?)(?:\?|$)/iu.test(url)
       || (info?.width ?? 0) < 900
       || (info?.height ?? 0) < 500
     ) continue;
+    try {
+      if (new URL(url).hostname !== "upload.wikimedia.org") continue;
+      if (!new URL(sourceUrl).hostname.endsWith("commons.wikimedia.org")) continue;
+    } catch {
+      continue;
+    }
     const artist = cleanText(info?.extmetadata?.Artist?.value, 100)
       || cleanText(info?.extmetadata?.Credit?.value, 100)
       || "Wikimedia Commons contributor";
@@ -106,6 +126,22 @@ export async function findEditorialArtwork(searchQuery: string): Promise<Editori
       license,
       sourceUrl,
     };
+  }
+  return null;
+}
+
+export async function findEditorialArtwork(
+  searchQuery: string,
+  fallbackQueries: readonly string[] = [],
+): Promise<EditorialArtwork | null> {
+  for (const query of artworkQueries(searchQuery, fallbackQueries)) {
+    try {
+      const artwork = await searchCommonsArtwork(query);
+      if (artwork) return artwork;
+    } catch {
+      // Artwork is an enhancement, not a reason to reject sourced content. The
+      // player retains its designed graphic fallback when Commons is unavailable.
+    }
   }
   return null;
 }

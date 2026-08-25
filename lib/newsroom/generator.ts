@@ -69,6 +69,7 @@ export type NewsroomGenerationResult = {
 
 const STORY_TARGET = 8;
 const MINIMUM_AIRABLE_STORIES = 4;
+const ARTWORK_WORKER_LIMIT = 4;
 const SENSITIVE_INCIDENT_PATTERN = /\b(?:was|were|has been|have been|is|are)\s+(?:arrested|charged|cited|injured|killed|reported missing)\b|\b(?:fatal|deadly|serious)\s+(?:crash|collision|fire|shooting)\b|\b(?:police|sheriff(?:'s)? office|authorities)\s+(?:are|is|continue to be)?\s*(?:investigating|searching|seeking)|\b(?:felony|misdemeanor)\s+charge(?:s)?\b/iu;
 const CRITICAL_PUBLIC_SAFETY_PATTERN = /\b(?:sexual assault|sexual abuse|rape|child abuse|homicide)\b|\b(?:murder|manslaughter)\s+charge(?:s|d)?\b|\b(?:minor|juvenile|child)\b.{0,80}\b(?:arrested|charged|victim|missing|abuse|assault)\b|\b(?:arrested|charged|victim|missing|abuse|assault)\b.{0,80}\b(?:minor|juvenile|child)\b|\b(?:accused|allegation|alleged)\s+(?:of|that)\b/iu;
 const SENSITIVE_COMMUNITY_PATTERN = /\b(?:died|death of|killed in|injured in|missing person|active investigation)\b|\b(?:alleged|accused of|allegation of)\s+(?:misconduct|fraud|corruption|abuse|harassment|crime|criminal conduct)\b/iu;
@@ -250,6 +251,38 @@ function parseStories(value: unknown, citations: Set<string>) {
   return stories.slice(0, 9);
 }
 
+function locationArtworkQuery(story: GeneratedStory, market: string) {
+  const location = story.locationLabel?.trim();
+  if (!location) return null;
+  const regionalLabel = /north carolina/iu.test(market) ? market : `${market} North Carolina`;
+  return location.toLowerCase().includes(market.toLowerCase())
+    ? `${location} North Carolina`
+    : `${location} ${regionalLabel}`;
+}
+
+async function attachSafeNewsroomArtwork(stories: GeneratedStory[], market: string) {
+  const resolved = stories.map((story) => ({ ...story }));
+  let nextIndex = 0;
+  await Promise.all(Array.from({ length: Math.min(ARTWORK_WORKER_LIMIT, resolved.length) }, async () => {
+    while (nextIndex < resolved.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      const story = resolved[index];
+      // Risk is recalculated locally after parsing, so a model cannot attach an
+      // image to an incident by incorrectly labeling it low risk.
+      if (story.riskLevel !== "low") continue;
+      const locationQuery = locationArtworkQuery(story, market);
+      const primaryQuery = story.artworkSearchQuery ?? locationQuery;
+      if (!primaryQuery) continue;
+      story.artwork = await findEditorialArtwork(
+        primaryQuery,
+        locationQuery && locationQuery.toLowerCase() !== primaryQuery.toLowerCase() ? [locationQuery] : [],
+      );
+    }
+  }));
+  return resolved;
+}
+
 function easternDateParts(now: Date) {
   const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", {
     timeZone: "America/New_York",
@@ -414,8 +447,9 @@ async function requestStories(market: string, slot: NewsroomSlot) {
         "Use low risk for routine government actions, meeting notices, school operations, roads, public weather, business openings, festivals, performances, arts and entertainment, event postponements, and ordinary community information without a real-world safety incident or accusation. Never classify a fictional title, play, book, movie, song, festival name, or quoted work as sensitive merely because its title contains a crime-related word.",
         "Do not place citations, Markdown links, source domains, URLs, or parenthetical source references inside the headline, summary, narration, or ticker. Attribution is displayed separately by the player.",
         "Keep the headline under 12 words. Summary is one or two on-screen sentences. Narration should be 55 to 90 words and understandable without audio because the summary will also be captioned. Ticker is one clean sentence.",
-        "Select varied visual templates. Use map for location-driven stories, civic for meetings and votes, numbers for election or budget data, photo only for non-sensitive places with a commercially reusable image likely available, lead for the strongest story, and headline otherwise.",
-        "Set artworkSearchQuery only for a real public place, government building, roadway, school exterior, landscape, or landmark. Never request a victim, suspect, arrest, mugshot, private residence, accident scene, or copyrighted news image.",
+        "Select varied visual templates. Use map for location-driven stories, civic for meetings and votes, numbers for election or budget data, photo for a strong non-sensitive location image, lead for the strongest story, and headline otherwise. Artwork may also support map, civic, numbers, lead, and headline templates.",
+        "For every low-risk story, make a serious attempt to set artworkSearchQuery to the exact public place, government building, roadway, school exterior, event venue, landscape, landmark, or publicly displayed object directly connected to the story. Use null only when no honest, non-misleading public setting exists.",
+        "For every sensitive or critical story, set artworkSearchQuery to null. Never request a victim, suspect, arrest, mugshot, private residence, accident scene, private person, publisher photo, logo, poster, or copyrighted news image.",
         "Do not repeat an earlier story unless the current source contains a material update. When news is light, favor upcoming public meetings, road work, school decisions, public deadlines, civic projects, and community events instead of padding or rewriting old facts.",
       ].join(" "),
       input: [
@@ -440,12 +474,7 @@ async function requestStories(market: string, slot: NewsroomSlot) {
   }
   const stories = parseStories(parsed, citedUrls(payload));
   if (stories.length < MINIMUM_AIRABLE_STORIES) throw new Error("Fewer than four verified stories survived source and safety checks.");
-  return Promise.all(stories.map(async (story) => ({
-    ...story,
-    artwork: story.artworkSearchQuery
-      ? await findEditorialArtwork(story.artworkSearchQuery).catch(() => null)
-      : null,
-  })));
+  return attachSafeNewsroomArtwork(stories, market);
 }
 
 export async function generateNewsroomEdition({
@@ -543,6 +572,7 @@ export async function generateNewsroomEdition({
         metadata: {
           provider: "openai_web_search",
           generatedAt: now.toISOString(),
+          artworkSearchQuery: story.artworkSearchQuery,
           artworkLicense: story.artwork?.license ?? null,
           humanReviewRequired: !autoApproved,
         },

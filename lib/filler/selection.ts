@@ -9,7 +9,7 @@ function stableNumber(value: string) {
   return hash >>> 0;
 }
 
-export function selectBalancedFiller<T extends { category: string; id?: string; title?: string }>(
+export function selectBalancedFiller<T extends { category: string; id?: string; title?: string; artworkUrl?: string | null }>(
   rows: readonly T[],
   limit = MAX_FILLER_ITEMS_PER_SCREEN,
   seed = "neusecast",
@@ -22,10 +22,14 @@ export function selectBalancedFiller<T extends { category: string; id?: string; 
   }
 
   for (const [category, bucket] of buckets) {
-    bucket.sort((left, right) => (
-      stableNumber(`${seed}:${category}:${left.id ?? left.title ?? ""}`)
-      - stableNumber(`${seed}:${category}:${right.id ?? right.title ?? ""}`)
-    ));
+    bucket.sort((left, right) => {
+      // Lead each category with its strongest television treatment while still
+      // preserving a stable rotation among cards with the same media state.
+      const mediaDifference = Number(Boolean(right.artworkUrl)) - Number(Boolean(left.artworkUrl));
+      if (mediaDifference) return mediaDifference;
+      return stableNumber(`${seed}:${category}:${left.id ?? left.title ?? ""}`)
+        - stableNumber(`${seed}:${category}:${right.id ?? right.title ?? ""}`);
+    });
   }
 
   const categories = [...buckets.keys()].sort((left, right) => (

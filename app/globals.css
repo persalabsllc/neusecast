@@ -7141,27 +7141,70 @@ a.contact-card:hover { border-color: rgba(67, 221, 193, 0.35); background: rgba(
   overflow: hidden;
   border: 1px solid rgba(var(--player-accent-rgb), 0.4);
   border-radius: clamp(16px, 2vw, 34px);
-  background: linear-gradient(145deg, rgba(19, 67, 79, 0.7), rgba(4, 20, 25, 0.88));
+  background:
+    radial-gradient(circle at 80% 22%, rgba(73, 172, 209, 0.2), transparent 31%),
+    repeating-radial-gradient(ellipse at 88% 70%, transparent 0 23px, rgba(129, 211, 227, 0.055) 24px 26px),
+    linear-gradient(145deg, #103e4a, #061d2b 72%, #04151e);
   box-shadow: 0 26px 80px rgba(0, 0, 0, 0.3);
 }
 
-.player-weather-map svg { display: block; width: 100%; height: auto; }
-.player-weather-map-land { fill: rgba(19, 72, 75, 0.85); stroke: rgba(158, 223, 219, 0.3); stroke-width: 2; }
-.player-weather-map-coast { fill: none; stroke: #75d8d0; stroke-width: 4; }
-.player-weather-map-river { fill: none; stroke: rgba(116, 200, 255, 0.55); stroke-width: 7; }
+.player-weather-map svg { position: relative; z-index: 1; display: block; width: 100%; height: auto; }
+.player-weather-map-land {
+  fill: #174b43;
+  stroke: rgba(177, 229, 194, 0.42);
+  stroke-width: 3;
+  filter: drop-shadow(8px 10px 15px rgba(0, 8, 12, 0.3));
+}
+.player-weather-map-coast { fill: none; stroke: #82dbbf; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+.player-weather-map-outer-banks { fill: none; stroke: #4e9b83; stroke-width: 12; stroke-linecap: round; filter: drop-shadow(2px 3px 4px rgba(0, 7, 11, .42)); }
+.player-weather-map-outer-banks-south { stroke-width: 8; stroke-dasharray: 19 9; }
+.player-weather-map-county-lines { fill: none; stroke: rgba(206, 234, 211, .16); stroke-width: 1.5; stroke-dasharray: 7 5; }
+.player-weather-map-waterways { fill: none; stroke: rgba(91, 184, 213, .74); stroke-width: 7; stroke-linecap: round; }
+.player-weather-map-waterways path:nth-child(3),
+.player-weather-map-waterways path:nth-child(4) { stroke-width: 4; }
+.player-weather-map-routes { fill: none; stroke: rgba(255, 239, 181, .38); stroke-width: 2.4; stroke-dasharray: 8 7; }
+.player-weather-map-routes text {
+  fill: rgba(255, 241, 190, .66);
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: .08em;
+  paint-order: stroke;
+  stroke: rgba(10, 45, 40, .8);
+  stroke-width: 4px;
+}
+.player-weather-map-water-labels text {
+  fill: rgba(171, 226, 240, .58);
+  font-size: 13px;
+  font-style: italic;
+  font-weight: 680;
+  letter-spacing: .06em;
+}
 .player-weather-map-band { fill: none; stroke: var(--weather-map-band-primary); stroke-width: 34; stroke-linecap: round; opacity: 0.72; animation: player-weather-map-band 6s ease-in-out infinite alternate; }
 .player-weather-map-band path + path { stroke: var(--weather-map-band-secondary); stroke-width: 24; }
+.player-weather-map-radar-ring {
+  fill: none;
+  stroke: rgba(255, 207, 101, .75);
+  stroke-width: 3;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: player-pulse 1.8s ease-in-out infinite;
+}
+.player-weather-map-cities rect { fill: rgba(3, 20, 25, .88); stroke: rgba(205, 236, 229, .24); stroke-width: 1.5; }
+.player-weather-map-cities .player-weather-map-city.is-primary rect { fill: rgba(31, 45, 34, .94); stroke: rgba(255, 207, 101, .62); stroke-width: 2; }
 .player-weather-map-cities circle { fill: #dcebea; stroke: #07191c; stroke-width: 3; }
 .player-weather-map-cities circle.is-primary { fill: #ffcf65; animation: player-pulse 1.8s ease-in-out infinite; }
-.player-weather-map-cities text { fill: #dcebea; font-size: 20px; font-weight: 700; paint-order: stroke; stroke: rgba(4, 19, 23, 0.85); stroke-width: 5px; }
-.player-weather-map-cities text.is-primary { fill: #fff2c6; font-size: 24px; }
+.player-weather-map-cities text { fill: #eff8f5; font-size: 17px; font-weight: 800; letter-spacing: -.01em; }
+.player-weather-map-cities text.temperature { fill: #9fdad4; font-size: 14px; font-weight: 720; letter-spacing: .03em; }
+.player-weather-map-cities text.is-primary { fill: #fff2c6; font-size: 21px; }
+.player-weather-map-cities text.temperature.is-primary { fill: #ffcf65; font-size: 17px; }
 
 .player-weather-map-key {
   position: absolute;
+  z-index: 3;
+  top: 4%;
   right: 3%;
-  bottom: 5%;
   display: flex;
-  max-width: 46%;
+  max-width: 38%;
   align-items: center;
   gap: 8px;
   padding: 0.6em 0.8em;
@@ -7307,8 +7350,10 @@ a.contact-card:hover { border-color: rgba(67, 221, 193, 0.35); background: rgba(
   .player-weather-facts strong { font-size: clamp(66px, 8cqw, 148px); }
   .player-weather-facts span { font-size: clamp(11px, 0.9cqw, 17px); }
   .player-weather-hero { width: min(38cqw, 680px); }
-  .player-weather-map-cities text { font-size: 23px; }
-  .player-weather-map-cities text.is-primary { font-size: 28px; }
+  .player-weather-map-cities text { font-size: 18px; }
+  .player-weather-map-cities text.temperature { font-size: 15px; }
+  .player-weather-map-cities text.is-primary { font-size: 22px; }
+  .player-weather-map-cities text.temperature.is-primary { font-size: 18px; }
   .player-weather-map-key { font-size: clamp(9px, 0.72cqw, 14px); }
 
   .player-weather-segment-periods .player-weather-periods > div {
