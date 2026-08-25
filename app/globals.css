@@ -8482,6 +8482,38 @@ a.contact-card:hover { border-color: rgba(67, 221, 193, 0.35); background: rgba(
 .detail-list dt { color: var(--muted); }
 .detail-list dd { margin: 0; text-align: right; }
 
+.screen-host-assignment {
+  margin: 0 0 22px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(67, 221, 193, .035);
+}
+
+.screen-host-assignment > summary {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 14px 16px;
+  cursor: pointer;
+  color: var(--paper-soft);
+  font-size: 13px;
+  font-weight: 700;
+  list-style: none;
+}
+
+.screen-host-assignment > summary::-webkit-details-marker { display: none; }
+
+.screen-host-assignment-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.screen-host-assignment-form > p { margin: 0; }
+.screen-host-assignment-actions { display: flex; justify-content: flex-end; }
+
 .player-url {
   display: block;
   overflow-wrap: anywhere;
@@ -8582,6 +8614,7 @@ a.contact-card:hover { border-color: rgba(67, 221, 193, 0.35); background: rgba(
 
 @media (max-width: 820px) {
   .screen-activation-form,
+  .screen-host-assignment-form,
   .screen-detail-grid { grid-template-columns: 1fr; }
   .screen-telemetry-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .exclusion-row { grid-template-columns: 1fr auto; }
