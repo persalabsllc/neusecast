@@ -127,7 +127,8 @@ export async function getNetworkChannelManifest(): Promise<PlayerManifest> {
   const eligibleGeneratedRows = regionalForecast
     ? generatedRows.filter((row) => row.category !== "weather")
     : generatedRows;
-  const fillerItems: PlayerItem[] = selectBalancedFiller(eligibleGeneratedRows).map((row) => ({
+  const rotationSeed = `network:${Math.floor(now.getTime() / (90 * 60 * 1_000))}`;
+  const fillerItems: PlayerItem[] = selectBalancedFiller(eligibleGeneratedRows, undefined, rotationSeed).map((row) => ({
     id: row.id,
     kind: resolveKind(row.category),
     source: "generated_content",
@@ -143,6 +144,8 @@ export async function getNetworkChannelManifest(): Promise<PlayerManifest> {
     sponsor: row.sourceName,
     contentCategory: row.category,
     mediaCredit: metadataString(row.metadata, "artworkCredit"),
+    visualTemplate: metadataString(row.metadata, "visualTemplate"),
+    locationLabel: metadataString(row.metadata, "locationLabel"),
     expiresAt: row.expiresAt?.toISOString() ?? null,
   }));
   if (regionalForecast) fillerItems.unshift(regionalWeatherItem(regionalForecast));

@@ -1,11 +1,19 @@
-export const MAX_FILLER_ITEMS_PER_SCREEN = 24;
+export const MAX_FILLER_ITEMS_PER_SCREEN = 120;
 
-export function selectBalancedFiller<T extends { category: string }>(
+function stableNumber(value: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+export function selectBalancedFiller<T extends { category: string; id?: string; title?: string }>(
   rows: readonly T[],
   limit = MAX_FILLER_ITEMS_PER_SCREEN,
+  seed = "neusecast",
 ) {
-  if (rows.length <= limit) return [...rows];
-
   const buckets = new Map<string, T[]>();
   for (const row of rows) {
     const bucket = buckets.get(row.category);
@@ -13,11 +21,23 @@ export function selectBalancedFiller<T extends { category: string }>(
     else buckets.set(row.category, [row]);
   }
 
+  for (const [category, bucket] of buckets) {
+    bucket.sort((left, right) => (
+      stableNumber(`${seed}:${category}:${left.id ?? left.title ?? ""}`)
+      - stableNumber(`${seed}:${category}:${right.id ?? right.title ?? ""}`)
+    ));
+  }
+
+  const categories = [...buckets.keys()].sort((left, right) => (
+    stableNumber(`${seed}:${left}`) - stableNumber(`${seed}:${right}`)
+  ));
+
   const selected: T[] = [];
   let index = 0;
   while (selected.length < limit) {
     let added = false;
-    for (const bucket of buckets.values()) {
+    for (const category of categories) {
+      const bucket = buckets.get(category) ?? [];
       const row = bucket[index];
       if (!row) continue;
       selected.push(row);

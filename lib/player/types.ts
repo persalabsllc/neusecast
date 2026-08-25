@@ -40,6 +40,8 @@ export type PlayerItem = {
   sponsor: string | null;
   contentCategory?: string | null;
   mediaCredit?: string | null;
+  visualTemplate?: string | null;
+  locationLabel?: string | null;
   weatherPeriods?: PlayerWeatherPeriod[];
   expiresAt?: string | null;
 };

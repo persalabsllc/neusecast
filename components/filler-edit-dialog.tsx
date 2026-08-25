@@ -7,8 +7,11 @@ import {
   FILLER_CATEGORIES,
   FILLER_CATEGORY_LABELS,
   FILLER_THEMES,
+  FILLER_VISUAL_TEMPLATES,
+  FILLER_VISUAL_TEMPLATE_LABELS,
   type FillerCategory,
   type FillerTheme,
+  type FillerVisualTemplate,
 } from "@/lib/filler/constants";
 
 type EditableFiller = {
@@ -23,6 +26,8 @@ type EditableFiller = {
   sourceUrl: string;
   artworkUrl: string;
   artworkCredit: string;
+  visualTemplate: FillerVisualTemplate;
+  locationLabel: string;
   theme: FillerTheme;
   durationSeconds: number;
   automatic: boolean;
@@ -100,7 +105,7 @@ export function FillerEditDialog({
             </header>
             <p id={`${dialogId}-description`} className="filler-edit-description">
               Changes reach online screens on their next playlist refresh. The current publish status and expiration are preserved.
-              {filler.automatic ? " This automatic card can still be replaced by its next scheduled refresh." : ""}
+              {filler.automatic ? " Automatic cards remain in the library until expiration; future generation adds new programming instead of replacing this card." : ""}
             </p>
             <form action={action} className="filler-form filler-edit-form">
               <input type="hidden" name="contentId" value={filler.id} />
@@ -114,6 +119,8 @@ export function FillerEditDialog({
               <label className="field"><span className="field-label">Source URL</span><input name="sourceUrl" type="url" defaultValue={filler.sourceUrl} /></label>
               <label className="field field-wide"><span className="field-label">Artwork URL (optional)</span><input name="artworkUrl" type="url" defaultValue={filler.artworkUrl} /></label>
               <label className="field field-wide"><span className="field-label">Visible artwork credit</span><input name="artworkCredit" maxLength={200} defaultValue={filler.artworkCredit} placeholder="Photo: creator / source / license" /></label>
+              <label className="field"><span className="field-label">Visual template</span><select name="visualTemplate" defaultValue={filler.visualTemplate}>{FILLER_VISUAL_TEMPLATES.map((template) => <option value={template} key={template}>{FILLER_VISUAL_TEMPLATE_LABELS[template]}</option>)}</select></label>
+              <label className="field"><span className="field-label">Location label</span><input name="locationLabel" maxLength={100} defaultValue={filler.locationLabel} /></label>
               <label className="field"><span className="field-label">Theme</span><select name="theme" defaultValue={filler.theme}>{FILLER_THEMES.map((theme) => <option value={theme} key={theme}>{theme[0].toUpperCase() + theme.slice(1)}</option>)}</select></label>
               <label className="field"><span className="field-label">Screen time (seconds)</span><input name="durationSeconds" type="number" min="8" max="30" step="1" defaultValue={filler.durationSeconds} required /></label>
               <div className="field-wide form-actions filler-edit-actions">

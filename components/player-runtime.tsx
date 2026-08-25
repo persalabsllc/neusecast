@@ -35,6 +35,22 @@ const kindLabels: Record<PlayerItem["kind"], string> = {
   ident: "NeuseCast Network",
 };
 
+const EVERGREEN_FILLER_CATEGORIES = new Set([
+  "did_you_know",
+  "fact",
+  "history",
+  "on_this_day",
+  "place_spotlight",
+  "then_and_now",
+  "river_and_coast",
+]);
+const EVERGREEN_REPLAY_GAP_MS = 90 * 60 * 1_000;
+
+function isEvergreenFiller(item: PlayerItem) {
+  return item.source === "generated_content"
+    && EVERGREEN_FILLER_CATEGORIES.has(item.contentCategory ?? "");
+}
+
 function KindIcon({ kind }: { kind: PlayerItem["kind"] }) {
   if (kind === "weather") return <CloudSun />;
   if (kind === "news") return <Newspaper />;
@@ -556,6 +572,7 @@ export function PlayerRuntime({
   const pairingTokenRef = useRef(pairingToken ?? null);
   const flushingPlayback = useRef(false);
   const refreshingManifest = useRef(false);
+  const recentEvergreenPlaysRef = useRef(new Map<string, number>());
   const stageRef = useRef<HTMLElement | null>(null);
   const playableItems = useMemo(() => manifest.items.filter((item) => {
     if (
@@ -577,8 +594,12 @@ export function PlayerRuntime({
   const isEditorialPhoto = Boolean(
     currentItem?.source === "generated_content"
     && currentItem.mediaUrl
-    && ["did_you_know", "fact", "history", "on_this_day"].includes(currentItem.contentCategory ?? ""),
+    && ["did_you_know", "fact", "history", "on_this_day", "place_spotlight", "then_and_now", "river_and_coast"].includes(currentItem.contentCategory ?? ""),
   );
+  const visualTemplate = ["editorial_split", "photo_feature", "place_card", "archival", "fact_reveal"]
+    .includes(currentItem?.visualTemplate ?? "")
+    ? currentItem?.visualTemplate
+    : "editorial_split";
   const activeAlerts = useMemo(() => (manifest.alerts ?? []).filter((alert) => {
     if (!alert.expiresAt) return true;
     const expiresAt = Date.parse(alert.expiresAt);
@@ -962,13 +983,30 @@ export function PlayerRuntime({
           if (currentItem.kind === "advertisement") void refreshManifest();
         });
       }
-      setActiveIndex((displayedIndex + 1) % playableItems.length);
+      const completedAt = Date.now();
+      const recentEvergreenPlays = recentEvergreenPlaysRef.current;
+      for (const [itemId, playedAt] of recentEvergreenPlays) {
+        if (completedAt - playedAt >= EVERGREEN_REPLAY_GAP_MS) recentEvergreenPlays.delete(itemId);
+      }
+      if (isEvergreenFiller(currentItem)) recentEvergreenPlays.set(currentItem.id, completedAt);
+
+      let nextIndex = (displayedIndex + 1) % playableItems.length;
+      for (let offset = 0; offset < playableItems.length; offset += 1) {
+        const candidateIndex = (displayedIndex + 1 + offset) % playableItems.length;
+        const candidate = playableItems[candidateIndex];
+        const lastPlayedAt = recentEvergreenPlays.get(candidate.id);
+        if (!isEvergreenFiller(candidate) || !lastPlayedAt || completedAt - lastPlayedAt >= EVERGREEN_REPLAY_GAP_MS) {
+          nextIndex = candidateIndex;
+          break;
+        }
+      }
+      setActiveIndex(nextIndex);
     }, currentItem.durationSeconds * 1000);
 
     return () => {
       window.clearTimeout(advance);
     };
-  }, [accessRevoked, currentItem, displayedIndex, manifest.version, manifestExpired, playableItems.length, playerVersion, preview, publicFeed, refreshManifest, sendPlayback]);
+  }, [accessRevoked, currentItem, displayedIndex, manifest.version, manifestExpired, playableItems, playerVersion, preview, publicFeed, refreshManifest, sendPlayback]);
 
   if (accessRevoked) {
     return (
@@ -1007,7 +1045,7 @@ export function PlayerRuntime({
   return (
     <main
       ref={stageRef}
-      className={`player-stage player-theme-${currentItem.theme} player-kind-${currentItem.kind}${hasMedia ? " player-has-media" : ""}${isEditorialPhoto ? " player-editorial-photo" : ""}${activeAlerts.length ? " player-has-alert" : ""}${embedded ? " player-embedded" : ""}`}
+      className={`player-stage player-theme-${currentItem.theme} player-kind-${currentItem.kind} player-template-${visualTemplate}${hasMedia ? " player-has-media" : ""}${isEditorialPhoto ? " player-editorial-photo" : ""}${activeAlerts.length ? " player-has-alert" : ""}${embedded ? " player-embedded" : ""}`}
       style={playerStyle}
     >
       <div className="player-orbit player-orbit-one" aria-hidden="true" />
@@ -1045,6 +1083,7 @@ export function PlayerRuntime({
           </div>
           <h1>{currentItem.title}</h1>
           <p>{currentItem.body}</p>
+          {currentItem.locationLabel ? <div className="player-location-tag"><MapPin aria-hidden="true" /> {currentItem.locationLabel}</div> : null}
           {currentItem.callToAction ? <div className="player-cta">{currentItem.callToAction}</div> : null}
         </div>
 

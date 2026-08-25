@@ -141,7 +141,7 @@ export async function getPlayerManifest(
 
   const broadcastDay = broadcastDayWindow(now, screen.timeZone);
 
-  const [creativeRows, hostRows, generatedRows, blockedRows, playbackRows, regionalForecast, regionalAlerts] = await Promise.all([
+  const [creativeRows, hostRows, generatedRows, blockedRows, playbackRows, recentFillerPlaybackRows, regionalForecast, regionalAlerts] = await Promise.all([
     database
       .selectDistinct({
         id: creatives.id,
@@ -235,6 +235,14 @@ export async function getPlayerManifest(
         lte(playbackEvents.playedAt, now),
       ))
       .groupBy(playbackEvents.campaignId),
+    database
+      .select({ metadata: playbackEvents.metadata })
+      .from(playbackEvents)
+      .where(and(
+        eq(playbackEvents.screenId, screen.id),
+        gte(playbackEvents.playedAt, new Date(now.getTime() - 90 * 60 * 1_000)),
+        lte(playbackEvents.playedAt, now),
+      )),
     regionalForecastPromise,
     regionalAlertsPromise,
   ]);
@@ -300,7 +308,17 @@ export async function getPlayerManifest(
   const eligibleGeneratedRows = regionalForecast
     ? generatedRows.filter((row) => row.category !== "weather")
     : generatedRows;
-  const fillerItems: PlayerItem[] = selectBalancedFiller(eligibleGeneratedRows).map((row) => ({
+  const recentlyPlayedFillerIds = new Set(recentFillerPlaybackRows.flatMap((row) => (
+    row.metadata?.source === "generated_content" && typeof row.metadata.itemId === "string"
+      ? [row.metadata.itemId]
+      : []
+  )));
+  const notRecentlyPlayedRows = eligibleGeneratedRows.filter((row) => !recentlyPlayedFillerIds.has(row.id));
+  const rotationRows = notRecentlyPlayedRows.length >= Math.min(6, eligibleGeneratedRows.length)
+    ? notRecentlyPlayedRows
+    : eligibleGeneratedRows;
+  const rotationSeed = `${screen.id}:${Math.floor(now.getTime() / (90 * 60 * 1_000))}`;
+  const fillerItems: PlayerItem[] = selectBalancedFiller(rotationRows, undefined, rotationSeed).map((row) => ({
     id: row.id,
     kind: resolveKind(row.category),
     source: "generated_content",
@@ -316,6 +334,8 @@ export async function getPlayerManifest(
     sponsor: row.sourceName,
     contentCategory: row.category,
     mediaCredit: metadataString(row.metadata, "artworkCredit"),
+    visualTemplate: metadataString(row.metadata, "visualTemplate"),
+    locationLabel: metadataString(row.metadata, "locationLabel"),
     expiresAt: row.expiresAt?.toISOString() ?? null,
   }));
   if (regionalForecast) fillerItems.unshift(regionalWeatherItem(regionalForecast));

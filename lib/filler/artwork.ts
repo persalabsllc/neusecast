@@ -14,6 +14,8 @@ type CommonsResponse = {
     pages?: Record<string, {
       title?: string;
       imageinfo?: Array<{
+        width?: number;
+        height?: number;
         thumburl?: string;
         url?: string;
         descriptionurl?: string;
@@ -59,7 +61,7 @@ export async function findEditorialArtwork(searchQuery: string): Promise<Editori
     gsrnamespace: "6",
     gsrlimit: "8",
     prop: "imageinfo",
-    iiprop: "url|extmetadata",
+    iiprop: "url|size|extmetadata",
     iiurlwidth: "1600",
   }).toString();
 
@@ -70,13 +72,31 @@ export async function findEditorialArtwork(searchQuery: string): Promise<Editori
   });
   if (!response.ok) return null;
   const payload = await response.json().catch(() => null) as CommonsResponse | null;
-  const pages = Object.values(payload?.query?.pages ?? {});
+  const queryTerms = new Set(query.toLowerCase().split(/\W+/u).filter((term) => term.length > 3));
+  const pages = Object.values(payload?.query?.pages ?? {}).sort((left, right) => {
+    const score = (page: typeof left) => {
+      const title = (page.title ?? "").toLowerCase();
+      const info = page.imageinfo?.[0];
+      const termScore = [...queryTerms].filter((term) => title.includes(term)).length * 10;
+      const landscapeScore = (info?.width ?? 0) >= (info?.height ?? Number.POSITIVE_INFINITY) ? 4 : 0;
+      const resolutionScore = (info?.width ?? 0) >= 1_200 ? 2 : 0;
+      return termScore + landscapeScore + resolutionScore;
+    };
+    return score(right) - score(left);
+  });
   for (const page of pages) {
     const info = page.imageinfo?.[0];
     const license = cleanText(info?.extmetadata?.LicenseShortName?.value, 80);
     const url = info?.thumburl ?? info?.url ?? "";
     const sourceUrl = info?.descriptionurl ?? "";
-    if (!url.startsWith("https://") || !sourceUrl.startsWith("https://") || !isCommerciallyReusableLicense(license)) continue;
+    if (
+      !url.startsWith("https://")
+      || !sourceUrl.startsWith("https://")
+      || !isCommerciallyReusableLicense(license)
+      || /\.(?:svg|gif)(?:\?|$)/iu.test(url)
+      || (info?.width ?? 0) < 900
+      || (info?.height ?? 0) < 500
+    ) continue;
     const artist = cleanText(info?.extmetadata?.Artist?.value, 100)
       || cleanText(info?.extmetadata?.Credit?.value, 100)
       || "Wikimedia Commons contributor";

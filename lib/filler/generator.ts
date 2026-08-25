@@ -1,17 +1,20 @@
 import "server-only";
 
 import { createHash } from "node:crypto";
-import { eq, inArray } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { getDatabase } from "@/lib/db";
 import { generatedContent, screens, venues } from "@/lib/db/schema";
 import {
   AUTOMATIC_FILLER_CATEGORIES,
   FILLER_CATEGORIES,
   FILLER_THEMES,
+  FILLER_VISUAL_TEMPLATES,
   type FillerCategory,
   type FillerTheme,
+  type FillerVisualTemplate,
 } from "./constants";
 import { findEditorialArtwork, type EditorialArtwork } from "./artwork";
+import { localSubjectPrompt } from "./local-subjects";
 
 type GeneratedFillerItem = {
   category: FillerCategory;
@@ -25,6 +28,8 @@ type GeneratedFillerItem = {
   durationSeconds: number;
   validUntil: string | null;
   artworkSearchQuery: string | null;
+  visualTemplate: FillerVisualTemplate;
+  locationLabel: string | null;
   artwork: EditorialArtwork | null;
 };
 
@@ -48,14 +53,15 @@ export type FillerGenerationResult = {
   errors: string[];
 };
 
-function fillerResponseSchema(categories: readonly FillerCategory[]) {
+function fillerResponseSchema(categories: readonly FillerCategory[], itemsPerCategory: number) {
+  const itemCount = categories.length * itemsPerCategory;
   return {
     type: "object",
     properties: {
       items: {
         type: "array",
-        minItems: categories.length,
-        maxItems: categories.length,
+        minItems: itemCount,
+        maxItems: itemCount,
         items: {
           type: "object",
           properties: {
@@ -70,6 +76,8 @@ function fillerResponseSchema(categories: readonly FillerCategory[]) {
             durationSeconds: { type: "integer", minimum: 8, maximum: 20 },
             validUntil: { type: ["string", "null"], maxLength: 40 },
             artworkSearchQuery: { type: ["string", "null"], maxLength: 120 },
+            visualTemplate: { type: "string", enum: FILLER_VISUAL_TEMPLATES },
+            locationLabel: { type: ["string", "null"], maxLength: 100 },
           },
           required: [
             "category",
@@ -83,6 +91,8 @@ function fillerResponseSchema(categories: readonly FillerCategory[]) {
             "durationSeconds",
             "validUntil",
             "artworkSearchQuery",
+            "visualTemplate",
+            "locationLabel",
           ],
           additionalProperties: false,
         },
@@ -141,11 +151,13 @@ function validateItems(
   value: unknown,
   citations: Set<string>,
   requestedCategories: readonly FillerCategory[],
+  itemsPerCategory: number,
 ): GeneratedFillerItem[] {
   if (!value || typeof value !== "object" || !Array.isArray((value as { items?: unknown }).items)) return [];
   const allowedCategories = new Set<string>(requestedCategories);
   const allowedThemes = new Set<string>(FILLER_THEMES);
-  const seen = new Set<FillerCategory>();
+  const allowedVisualTemplates = new Set<string>(FILLER_VISUAL_TEMPLATES);
+  const categoryCounts = new Map<FillerCategory, number>();
   const items: GeneratedFillerItem[] = [];
 
   for (const raw of (value as { items: unknown[] }).items) {
@@ -154,9 +166,10 @@ function validateItems(
     if (
       typeof item.category !== "string"
       || !allowedCategories.has(item.category)
-      || seen.has(item.category as FillerCategory)
       || typeof item.theme !== "string"
       || !allowedThemes.has(item.theme)
+      || typeof item.visualTemplate !== "string"
+      || !allowedVisualTemplates.has(item.visualTemplate)
     ) continue;
     const sourceUrl = boundedText(item.sourceUrl, 2_000);
     if (!isCited(sourceUrl, citations)) continue;
@@ -167,7 +180,9 @@ function validateItems(
     if (!title || !body || !eyebrow || !sourceName) continue;
     const duration = Number(item.durationSeconds);
     const category = item.category as FillerCategory;
-    seen.add(category);
+    const categoryCount = categoryCounts.get(category) ?? 0;
+    if (categoryCount >= itemsPerCategory) continue;
+    categoryCounts.set(category, categoryCount + 1);
     items.push({
       category,
       title,
@@ -180,6 +195,8 @@ function validateItems(
       durationSeconds: Number.isFinite(duration) ? Math.max(8, Math.min(20, Math.round(duration))) : 12,
       validUntil: boundedText(item.validUntil, 40) || null,
       artworkSearchQuery: boundedText(item.artworkSearchQuery, 120) || null,
+      visualTemplate: item.visualTemplate as FillerVisualTemplate,
+      locationLabel: boundedText(item.locationLabel, 100) || null,
       artwork: null,
     });
   }
@@ -255,7 +272,21 @@ function fingerprint(market: string, item: GeneratedFillerItem) {
     .digest("hex");
 }
 
-async function requestMarketBatch(market: string, categories: readonly FillerCategory[]) {
+async function recentAutomaticTitles(market: string) {
+  const rows = await getDatabase()
+    .select({ title: generatedContent.title })
+    .from(generatedContent)
+    .where(eq(generatedContent.market, market))
+    .orderBy(desc(generatedContent.createdAt))
+    .limit(80);
+  return rows.map((row) => row.title).filter(Boolean);
+}
+
+async function requestMarketBatch(
+  market: string,
+  categories: readonly FillerCategory[],
+  itemsPerCategory: number,
+) {
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) throw new Error("OPENAI_API_KEY is not configured.");
   const model = process.env.OPENAI_FILLER_MODEL?.trim() || "gpt-5.6-luna";
@@ -263,6 +294,8 @@ async function requestMarketBatch(market: string, categories: readonly FillerCat
     timeZone: "America/New_York",
     dateStyle: "full",
   }).format(new Date());
+  const recentTitles = await recentAutomaticTitles(market);
+  const localSubjects = localSubjectPrompt(categories);
 
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
@@ -283,20 +316,24 @@ async function requestMarketBatch(market: string, categories: readonly FillerCat
         "Prefer official government, museum, library, tourism, weather, venue, and established local-news sources.",
         "Do not invent events, dates, weather, statistics, quotations, businesses, or URLs.",
         "For an event, use one occurring within the next 14 days and set validUntil to its end time as ISO 8601 with a numeric timezone offset. Set validUntil to null for every other category.",
-        "For did_you_know, history, fact, and on_this_day, provide a short artworkSearchQuery naming the exact person, place, object, or event a relevant archival photograph should depict. Set it to null for other categories.",
+        "For place_spotlight, did_you_know, history, then_and_now, river_and_coast, fact, and on_this_day, provide a short artworkSearchQuery naming the exact real place, person, object, or event the photograph should depict. Include New Bern, Craven County, or North Carolina in the query when it improves accuracy.",
+        "Choose visualTemplate from editorial_split, photo_feature, place_card, archival, and fact_reveal. Use place_card for recognizable destinations, archival for historical subjects, photo_feature for scenic places, fact_reveal for surprising facts, and editorial_split otherwise.",
+        "Set locationLabel to the specific city, landmark, river, neighborhood, or county when relevant, otherwise null.",
+        "Avoid generic national trivia. Favor New Bern first, then Craven County, the Neuse and Trent rivers, and the surrounding Eastern North Carolina region.",
+        "Do not repeat or lightly rephrase any recent headline supplied in the request.",
         "Write for a television glance: one short headline and no more than two short body sentences.",
-        "Return exactly one item in every requested category.",
+        `Return exactly ${itemsPerCategory} distinct item${itemsPerCategory === 1 ? "" : "s"} in every requested category.`,
       ].join(" "),
-      input: `Today is ${today}. Research and create one sourced card for each requested category for ${market}, North Carolina and the surrounding Eastern North Carolina region: ${categories.join(", ")}. Use a directly supporting source URL for each card.`,
+      input: `Today is ${today}. Research and create sourced cards for ${market}, North Carolina and the surrounding Eastern North Carolina region in these categories: ${categories.join(", ")}. Use a directly supporting source URL for each card. Use the following curated New Bern subjects when they fit, while varying the selections between batches: ${localSubjects || "none supplied"}. Recent headlines that must not be repeated: ${recentTitles.length ? recentTitles.join(" | ") : "none yet"}.`,
       text: {
         format: {
           type: "json_schema",
           name: "neusecast_filler_batch",
           strict: true,
-          schema: fillerResponseSchema(categories),
+          schema: fillerResponseSchema(categories, itemsPerCategory),
         },
       },
-      max_output_tokens: 5_000,
+      max_output_tokens: 12_000,
     }),
     signal: AbortSignal.timeout(120_000),
   });
@@ -313,7 +350,7 @@ async function requestMarketBatch(market: string, categories: readonly FillerCat
   } catch {
     throw new Error("OpenAI returned filler content that could not be parsed.");
   }
-  const items = validateItems(parsed, citedUrls(payload), categories);
+  const items = validateItems(parsed, citedUrls(payload), categories, itemsPerCategory);
   return Promise.all(items.map(async (item) => ({
     ...item,
     artwork: item.artworkSearchQuery
@@ -347,14 +384,6 @@ async function saveMarketBatch(market: string, items: GeneratedFillerItem[]) {
     const itemFingerprint = fingerprint(market, item);
     const matching = existingByFingerprint.get(itemFingerprint);
     if (matching) {
-      const previousAutomaticIds = existing
-        .filter((row) => (
-          row.id !== matching.id
-          && row.approved
-          && row.category === item.category
-          && row.metadata?.origin === "automatic"
-        ))
-        .map((row) => row.id);
       const refresh = database
         .update(generatedContent)
         .set({
@@ -382,27 +411,16 @@ async function saveMarketBatch(market: string, items: GeneratedFillerItem[]) {
             artworkCredit: item.artwork?.credit ?? matching.metadata?.artworkCredit ?? null,
             artworkLicense: item.artwork?.license ?? matching.metadata?.artworkLicense ?? null,
             artworkSourceUrl: item.artwork?.sourceUrl ?? matching.metadata?.artworkSourceUrl ?? null,
+            visualTemplate: item.visualTemplate,
+            locationLabel: item.locationLabel,
           },
           updatedAt: now,
         })
         .where(eq(generatedContent.id, matching.id));
-      if (previousAutomaticIds.length) {
-        await database.batch([
-          refresh,
-          database
-            .update(generatedContent)
-            .set({ approved: false, expiresAt: now, updatedAt: now })
-            .where(inArray(generatedContent.id, previousAutomaticIds)),
-        ]);
-      } else {
-        await refresh;
-      }
+      await refresh;
       skipped += 1;
       continue;
     }
-    const previousAutomaticIds = existing
-      .filter((row) => row.approved && row.category === item.category && row.metadata?.origin === "automatic")
-      .map((row) => row.id);
     const insert = database.insert(generatedContent).values({
       category: item.category,
       market,
@@ -428,19 +446,11 @@ async function saveMarketBatch(market: string, items: GeneratedFillerItem[]) {
         artworkCredit: item.artwork?.credit ?? null,
         artworkLicense: item.artwork?.license ?? null,
         artworkSourceUrl: item.artwork?.sourceUrl ?? null,
+        visualTemplate: item.visualTemplate,
+        locationLabel: item.locationLabel,
       },
     });
-    if (previousAutomaticIds.length) {
-      await database.batch([
-        insert,
-        database
-          .update(generatedContent)
-          .set({ approved: false, expiresAt: now, updatedAt: now })
-          .where(inArray(generatedContent.id, previousAutomaticIds)),
-      ]);
-    } else {
-      await insert;
-    }
+    await insert;
     existingByFingerprint.set(itemFingerprint, {
       id: "",
       category: item.category,
@@ -453,6 +463,8 @@ async function saveMarketBatch(market: string, items: GeneratedFillerItem[]) {
         artworkCredit: item.artwork?.credit ?? null,
         artworkLicense: item.artwork?.license ?? null,
         artworkSourceUrl: item.artwork?.sourceUrl ?? null,
+        visualTemplate: item.visualTemplate,
+        locationLabel: item.locationLabel,
       },
     });
     created += 1;
@@ -486,19 +498,23 @@ export async function activeFillerMarkets() {
 export async function generateAutomaticFiller(
   markets?: string[],
   categories: readonly FillerCategory[] = AUTOMATIC_FILLER_CATEGORIES,
+  itemsPerCategory = 1,
 ): Promise<FillerGenerationResult> {
   const requestedMarkets = (markets?.length ? markets : await activeFillerMarkets())
     .map((market) => market.trim().slice(0, 100))
     .filter(Boolean);
   const uniqueMarkets = [...new Set(requestedMarkets)];
   const requestedCategories = [...new Set(categories)].filter((category) => FILLER_CATEGORIES.includes(category));
+  const requestedItemCount = Math.max(1, Math.min(3, Math.round(itemsPerCategory)));
   const result: FillerGenerationResult = { markets: uniqueMarkets.length, created: 0, skipped: 0, errors: [] };
   if (requestedCategories.length === 0) return result;
 
   const generateMarket = async (market: string) => {
     try {
-      const items = await requestMarketBatch(market, requestedCategories);
-      const missing = requestedCategories.filter((category) => !items.some((item) => item.category === category));
+      const items = await requestMarketBatch(market, requestedCategories, requestedItemCount);
+      const missing = requestedCategories.filter((category) => (
+        items.filter((item) => item.category === category).length < requestedItemCount
+      ));
       const saved = await saveMarketBatch(market, items);
       return {
         ...saved,

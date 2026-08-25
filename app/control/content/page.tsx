@@ -6,6 +6,7 @@ import {
   Clock3,
   CloudSun,
   History,
+  Image as ImageIcon,
   Lightbulb,
   LockKeyhole,
   Megaphone,
@@ -37,7 +38,10 @@ import {
   AUTOMATIC_FILLER_CATEGORIES,
   FILLER_CATEGORIES,
   FILLER_CATEGORY_LABELS,
+  FILLER_GENERATION_PROGRAMS,
   FILLER_THEMES,
+  FILLER_VISUAL_TEMPLATES,
+  FILLER_VISUAL_TEMPLATE_LABELS,
   type FillerCategory,
 } from "@/lib/filler/constants";
 import { selectBalancedFiller } from "@/lib/filler/selection";
@@ -90,6 +94,7 @@ function FillerIcon({ category }: { category: string }) {
   if (category === "news") return <Newspaper size={18} />;
   if (category === "event") return <CalendarDays size={18} />;
   if (category === "history" || category === "on_this_day") return <History size={18} />;
+  if (["place_spotlight", "then_and_now", "river_and_coast"].includes(category)) return <ImageIcon size={18} />;
   return <Lightbulb size={18} />;
 }
 
@@ -246,20 +251,25 @@ export default async function ContentPage({ searchParams }: {
             <label className="field"><span className="field-label">Source URL</span><input name="sourceUrl" type="url" /></label>
             <label className="field field-wide"><span className="field-label">Artwork URL (optional)</span><input name="artworkUrl" type="url" /></label>
             <label className="field field-wide"><span className="field-label">Visible artwork credit</span><input name="artworkCredit" maxLength={200} placeholder="Photo: creator / source / license" /></label>
+            <label className="field"><span className="field-label">Visual template</span><select name="visualTemplate" defaultValue="editorial_split">{FILLER_VISUAL_TEMPLATES.map((template) => <option value={template} key={template}>{FILLER_VISUAL_TEMPLATE_LABELS[template]}</option>)}</select></label>
+            <label className="field"><span className="field-label">Location label</span><input name="locationLabel" maxLength={100} placeholder="Union Point Park · New Bern" /></label>
             <label className="field"><span className="field-label">Theme</span><select name="theme" defaultValue="navy">{FILLER_THEMES.map((theme) => <option value={theme} key={theme}>{theme[0].toUpperCase() + theme.slice(1)}</option>)}</select></label>
             <label className="field"><span className="field-label">Screen time</span><select name="durationSeconds" defaultValue="12"><option value="10">10 seconds</option><option value="12">12 seconds</option><option value="15">15 seconds</option><option value="20">20 seconds</option></select></label>
-            <label className="field"><span className="field-label">Expires</span><select name="lifetime" defaultValue="never"><option value="never">Never</option><option value="1_day">After 1 day</option><option value="7_days">After 7 days</option><option value="30_days">After 30 days</option></select></label>
+            <label className="field"><span className="field-label">Expires</span><select name="lifetime" defaultValue="90_days"><option value="90_days">After 90 days</option><option value="120_days">After 120 days</option><option value="30_days">After 30 days</option><option value="7_days">After 7 days</option><option value="1_day">After 1 day</option><option value="never">Never</option></select></label>
             <label className="checkbox-field filler-publish"><input name="publish" type="checkbox" defaultChecked /><span><strong>Publish immediately</strong><small>Uncheck to save it paused.</small></span></label>
             <div className="field-wide form-actions"><CreateFillerButton /></div>
           </form>
         </details>
 
         <article className="panel filler-automation-panel">
-          <div className="panel-heading"><div><p className="panel-kicker"><Sparkles size={14} /> Automatic filler</p><h2>Research fresh local cards</h2><p>Editorial cards use verified live sources and licensed photography. The National Weather Service forecast is managed separately and updates automatically.</p></div></div>
+          <div className="panel-heading"><div><p className="panel-kicker"><Sparkles size={14} /> Programming generator</p><h2>Build fresh local television</h2><p>Choose a series and NeuseCast researches sourced stories, finds commercially reusable photography, assigns an animated template, and schedules evergreen cards for 90 days.</p></div></div>
           <form action={generateFillerNow} className="automation-form">
             <label className="field"><span className="field-label">Market</span><input name="market" list="automatic-filler-markets" placeholder="Blank = all active markets" /><datalist id="automatic-filler-markets">{markets.map((market) => <option value={market} key={market} />)}</datalist></label>
+            <label className="field"><span className="field-label">Programming series</span><select name="program" defaultValue="photo_rich">{Object.entries(FILLER_GENERATION_PROGRAMS).map(([key, program]) => <option value={key} key={key}>{program.label}</option>)}</select></label>
+            <label className="field"><span className="field-label">Cards per category</span><select name="itemsPerCategory" defaultValue="1"><option value="1">1 each</option><option value="2">2 each</option><option value="3">3 each</option></select></label>
             <GenerateFillerButton />
           </form>
+          <p className="automation-note"><strong>Best first run:</strong> Photo-rich local programming · 2 each creates 12 distinct local cards. Run it again later and the generator avoids recent headlines instead of replacing the library.</p>
           <div className="automation-categories">
             {AUTOMATIC_FILLER_CATEGORIES.map((category) => <span key={category}><Check size={12} /> {FILLER_CATEGORY_LABELS[category]}</span>)}
             <span><CloudSun size={12} /> Weather · Live NWS</span>
@@ -296,6 +306,8 @@ export default async function ContentPage({ searchParams }: {
                   <div className="metadata-row">
                     <span>{categoryLabel(item.category)}</span>
                     <span>{origin}</span>
+                    <span>{FILLER_VISUAL_TEMPLATE_LABELS[(metadataText(item.metadata, "visualTemplate") ?? "editorial_split") as keyof typeof FILLER_VISUAL_TEMPLATE_LABELS] ?? "Editorial split"}</span>
+                    <span>{item.artworkUrl ? `Photo ready${metadataText(item.metadata, "artworkLicense") ? ` · ${metadataText(item.metadata, "artworkLicense")}` : ""}` : "Graphic fallback"}</span>
                     <span>{metadataNumber(item.metadata, "durationSeconds", 12)} sec</span>
                     <span>{item.market || "Every market"}</span>
                     <span>{eligibleScreenCount} eligible screen{eligibleScreenCount === 1 ? "" : "s"}</span>
@@ -325,6 +337,8 @@ export default async function ContentPage({ searchParams }: {
                       sourceUrl: item.sourceUrl ?? "",
                       artworkUrl: item.artworkUrl ?? "",
                       artworkCredit: metadataText(item.metadata, "artworkCredit") ?? "",
+                      visualTemplate: (metadataText(item.metadata, "visualTemplate") ?? "editorial_split") as (typeof FILLER_VISUAL_TEMPLATES)[number],
+                      locationLabel: metadataText(item.metadata, "locationLabel") ?? "",
                       theme: (metadataText(item.metadata, "theme") ?? "navy") as (typeof FILLER_THEMES)[number],
                       durationSeconds: metadataNumber(item.metadata, "durationSeconds", 12),
                       automatic: metadataText(item.metadata, "origin") === "automatic",

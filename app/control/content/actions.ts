@@ -10,9 +10,13 @@ import { isControlRoomEmail } from "@/lib/control-room-access";
 import { generatedContent } from "@/lib/db/schema";
 import {
   FILLER_CATEGORIES,
+  FILLER_GENERATION_PROGRAMS,
   FILLER_THEMES,
+  FILLER_VISUAL_TEMPLATES,
   type FillerCategory,
+  type FillerGenerationProgram,
   type FillerTheme,
+  type FillerVisualTemplate,
 } from "@/lib/filler/constants";
 import { generateAutomaticFiller } from "@/lib/filler/generator";
 
@@ -43,7 +47,12 @@ function optionalHttpUrl(formData: FormData, key: string) {
 
 function expiration(formData: FormData, now: Date) {
   const lifetime = value(formData, "lifetime", 20);
-  const days = lifetime === "1_day" ? 1 : lifetime === "7_days" ? 7 : lifetime === "30_days" ? 30 : 0;
+  const days = lifetime === "1_day" ? 1
+    : lifetime === "7_days" ? 7
+      : lifetime === "30_days" ? 30
+        : lifetime === "90_days" ? 90
+          : lifetime === "120_days" ? 120
+            : 0;
   return days ? new Date(now.getTime() + days * 24 * 60 * 60 * 1_000) : null;
 }
 
@@ -51,6 +60,10 @@ export async function createFillerContent(formData: FormData) {
   await requireControlUser();
   const category = value(formData, "category", 40) as FillerCategory;
   const theme = value(formData, "theme", 20) as FillerTheme;
+  const requestedVisualTemplate = value(formData, "visualTemplate", 40) as FillerVisualTemplate;
+  const visualTemplate = FILLER_VISUAL_TEMPLATES.includes(requestedVisualTemplate)
+    ? requestedVisualTemplate
+    : "editorial_split";
   const title = value(formData, "title", 180);
   const body = value(formData, "body", 1_000);
   if (!FILLER_CATEGORIES.includes(category) || !FILLER_THEMES.includes(theme) || !title || !body) {
@@ -76,6 +89,8 @@ export async function createFillerContent(formData: FormData) {
       eyebrow: value(formData, "eyebrow", 80) || null,
       callToAction: value(formData, "callToAction", 120) || null,
       artworkCredit: value(formData, "artworkCredit", 200) || null,
+      visualTemplate,
+      locationLabel: value(formData, "locationLabel", 100) || null,
       theme,
       durationSeconds,
       createdBy: "control_room",
@@ -91,12 +106,14 @@ export async function updateFillerContent(formData: FormData) {
   const contentId = value(formData, "contentId", 36);
   const category = value(formData, "category", 40) as FillerCategory;
   const theme = value(formData, "theme", 20) as FillerTheme;
+  const requestedVisualTemplate = value(formData, "visualTemplate", 40) as FillerVisualTemplate;
   const title = value(formData, "title", 180);
   const body = value(formData, "body", 1_000);
   if (
     !contentId
     || !FILLER_CATEGORIES.includes(category)
     || !FILLER_THEMES.includes(theme)
+    || !FILLER_VISUAL_TEMPLATES.includes(requestedVisualTemplate)
     || !title
     || !body
   ) return;
@@ -128,6 +145,8 @@ export async function updateFillerContent(formData: FormData) {
         eyebrow: value(formData, "eyebrow", 80) || null,
         callToAction: value(formData, "callToAction", 120) || null,
         artworkCredit: value(formData, "artworkCredit", 200) || null,
+        visualTemplate: requestedVisualTemplate,
+        locationLabel: value(formData, "locationLabel", 100) || null,
         theme,
         durationSeconds,
         editedAt: now.toISOString(),
@@ -151,7 +170,7 @@ export async function setFillerActive(formData: FormData) {
     .set({
       approved,
       ...(approved && value(formData, "resetExpiry", 5) === "true"
-        ? { startsAt: now, expiresAt: null }
+        ? { startsAt: now, expiresAt: new Date(now.getTime() + 90 * 24 * 60 * 60 * 1_000) }
         : {}),
       updatedAt: now,
     })
@@ -172,7 +191,15 @@ export async function deleteFillerContent(formData: FormData) {
 export async function generateFillerNow(formData: FormData) {
   await requireControlUser();
   const market = value(formData, "market", 100);
-  const result = await generateAutomaticFiller(market ? [market] : undefined);
+  const requestedProgram = value(formData, "program", 40) as FillerGenerationProgram;
+  const program = requestedProgram in FILLER_GENERATION_PROGRAMS ? requestedProgram : "photo_rich";
+  const requestedCount = Number(value(formData, "itemsPerCategory", 2));
+  const itemsPerCategory = Number.isFinite(requestedCount) ? Math.max(1, Math.min(3, Math.round(requestedCount))) : 1;
+  const result = await generateAutomaticFiller(
+    market ? [market] : undefined,
+    FILLER_GENERATION_PROGRAMS[program].categories,
+    itemsPerCategory,
+  );
   revalidatePath("/control/content");
   revalidatePath("/control/screens");
   const params = new URLSearchParams({
