@@ -5133,6 +5133,7 @@ a.contact-card:hover { border-color: rgba(67, 221, 193, 0.35); background: rgba(
 
 .watch-player-section {
   position: relative;
+  padding-bottom: clamp(70px, 9vw, 140px);
 }
 
 .watch-player-frame {
@@ -5724,6 +5725,39 @@ a.contact-card:hover { border-color: rgba(67, 221, 193, 0.35); background: rgba(
   min-height: 230px;
   place-items: center;
   overflow: hidden;
+  background:
+    linear-gradient(rgba(143, 226, 255, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(143, 226, 255, 0.055) 1px, transparent 1px);
+  background-size: 34px 34px;
+}
+
+.player-weather-scene::before {
+  position: absolute;
+  z-index: 1;
+  inset: -45%;
+  background: conic-gradient(
+    from 15deg,
+    transparent 0deg 285deg,
+    rgba(92, 230, 209, 0.03) 300deg,
+    rgba(92, 230, 209, 0.34) 342deg,
+    transparent 360deg
+  );
+  content: "";
+  transform-origin: center;
+  animation: player-weather-radar 5.5s linear infinite;
+}
+
+.player-weather-scene::after {
+  position: absolute;
+  z-index: 3;
+  inset: 10% 12%;
+  border: 1px solid rgba(143, 226, 255, 0.16);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 28px rgba(143, 226, 255, 0.045),
+    0 0 0 58px rgba(143, 226, 255, 0.025);
+  content: "";
+  pointer-events: none;
 }
 
 .player-weather-sun {
@@ -5735,7 +5769,7 @@ a.contact-card:hover { border-color: rgba(67, 221, 193, 0.35); background: rgba(
   border-radius: 50%;
   background: #ffd775;
   box-shadow: 0 0 0 18px rgba(255, 215, 117, 0.08), 0 0 60px rgba(255, 215, 117, 0.34);
-  animation: player-weather-sun 9s linear infinite;
+  animation: player-weather-sun 4.8s ease-in-out infinite;
 }
 
 .player-weather-cloud {
@@ -5747,7 +5781,7 @@ a.contact-card:hover { border-color: rgba(67, 221, 193, 0.35); background: rgba(
   place-items: center;
   color: #f6fbf8;
   filter: drop-shadow(0 18px 28px rgba(0, 0, 0, 0.28));
-  animation: player-weather-float 4.2s ease-in-out infinite;
+  animation: player-weather-float 3.2s ease-in-out infinite;
 }
 
 .player-weather-cloud svg {
@@ -5764,7 +5798,7 @@ a.contact-card:hover { border-color: rgba(67, 221, 193, 0.35); background: rgba(
   height: 2px;
   border-radius: 99px;
   background: linear-gradient(90deg, transparent, rgba(246, 251, 248, 0.5), transparent);
-  animation: player-weather-wind 4.8s linear infinite;
+  animation: player-weather-wind 3.2s linear infinite;
 }
 
 .player-weather-wind-one { top: 34%; }
@@ -5806,7 +5840,11 @@ a.contact-card:hover { border-color: rgba(67, 221, 193, 0.35); background: rgba(
   gap: 3px;
   padding: clamp(9px, 1vw, 16px) clamp(5px, 0.7vw, 11px);
   text-align: center;
+  animation: player-weather-period 3.8s ease-in-out infinite;
 }
+
+.player-weather-periods > div:nth-child(2) { animation-delay: -2.55s; }
+.player-weather-periods > div:nth-child(3) { animation-delay: -1.25s; }
 
 .player-weather-periods > div + div {
   border-left: 1px solid rgba(255, 255, 255, 0.1);
@@ -6084,6 +6122,15 @@ a.contact-card:hover { border-color: rgba(67, 221, 193, 0.35); background: rgba(
   20% { opacity: 0.75; }
   80% { opacity: 0.75; }
   to { transform: translate3d(190%, 0, 0); opacity: 0; }
+}
+
+@keyframes player-weather-radar {
+  to { transform: rotate(1turn); }
+}
+
+@keyframes player-weather-period {
+  0%, 72%, 100% { background: transparent; }
+  82% { background: rgba(var(--player-accent-rgb), 0.13); }
 }
 
 @keyframes player-news-radar {
