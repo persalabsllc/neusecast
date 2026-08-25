@@ -409,7 +409,12 @@ export async function addHostProspectNote(formData: FormData) {
 
 export async function importHostProspectResearch(formData: FormData) {
   const user = await requireControlUser();
-  const raw = value(formData, "batch", 120_000);
+  const uploadedFile = formData.get("batchFile");
+  let raw = value(formData, "batch", 120_000);
+  if (uploadedFile instanceof File && uploadedFile.size > 0) {
+    if (uploadedFile.size > 120_000) redirect("/control/prospects?error=import");
+    raw = (await uploadedFile.text()).trim().slice(0, 120_000);
+  }
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
