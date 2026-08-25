@@ -890,6 +890,52 @@ textarea:focus-visible {
   line-height: 1.45;
 }
 
+.host-inline-benefits {
+  display: grid;
+  gap: 10px;
+  margin-top: 30px;
+}
+
+.host-inline-benefits span {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  color: var(--paper-soft);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.host-inline-benefits svg { margin-top: 1px; color: var(--tide); }
+
+.host-application-panel {
+  padding: clamp(25px, 3.5vw, 42px);
+  border: 1px solid var(--line);
+  border-radius: 23px;
+  background:
+    radial-gradient(circle at 88% 7%, rgba(67, 221, 193, 0.12), transparent 18rem),
+    linear-gradient(145deg, rgba(16, 36, 42, 0.92), rgba(9, 21, 26, 0.88));
+  box-shadow: var(--shadow);
+}
+
+.host-application-heading {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 24px;
+}
+
+.host-application-heading p { margin: 0 0 5px; color: var(--tide); font-size: 9px; font-weight: 750; letter-spacing: .11em; text-transform: uppercase; }
+.host-application-heading h3 { margin: 0; font-size: 22px; letter-spacing: -.035em; }
+.host-application-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 20px; }
+.host-application-form .field-label small { color: var(--muted); font-size: 9px; font-weight: 500; }
+.host-application-state { grid-column: span 1; }
+.host-application-zip { grid-column: span 1; }
+.host-application-consent { display: flex; align-items: flex-start; gap: 10px; padding: 13px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.02); color: var(--muted-bright); font-size: 10px; line-height: 1.45; }
+.host-application-consent input { width: 17px; height: 17px; flex: 0 0 17px; margin: 0; accent-color: var(--tide); }
+.host-application-existing { margin: 17px 0 0; color: var(--muted); font-size: 10px; text-align: center; }
+.host-application-existing a { color: var(--tide); font-weight: 700; }
+.host-application-honeypot { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+
 .host-benefit-panel {
   position: relative;
   padding: clamp(28px, 4vw, 47px);
@@ -5346,6 +5392,11 @@ a.contact-card:hover { border-color: rgba(67, 221, 193, 0.35); background: rgba(
   .host-footer {
     flex-direction: column;
   }
+
+  .host-application-form { grid-template-columns: 1fr; }
+  .host-application-form .field-wide,
+  .host-application-state,
+  .host-application-zip { grid-column: auto; }
 }
 
 @media (prefers-reduced-motion: reduce) {
