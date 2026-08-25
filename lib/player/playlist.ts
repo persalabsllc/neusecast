@@ -20,9 +20,10 @@ import type { PlayerItem, PlayerItemKind, PlayerManifest, PlayerTheme } from "./
 import { NEUSECAST_HOUSE_AD } from "./house-ad";
 import { broadcastDayWindow } from "@/lib/time-zone";
 import { getRegionalAlerts, getRegionalForecast, regionalWeatherItem } from "./weather";
+import { insertNetworkIdents } from "./idents";
 
 const THEMES = new Set<PlayerTheme>(["aqua", "navy", "coral", "gold", "blue", "green"]);
-const KINDS = new Set<PlayerItemKind>(["advertisement", "host", "weather", "news", "event", "history", "trivia", "community"]);
+const KINDS = new Set<PlayerItemKind>(["advertisement", "host", "weather", "news", "event", "history", "trivia", "community", "ident"]);
 const HOST_THEMES: Record<string, PlayerTheme> = { special: "coral", event: "aqua", announcement: "blue", menu: "gold" };
 
 function metadataString(metadata: Record<string, unknown> | null, key: string) {
@@ -319,7 +320,10 @@ export async function getPlayerManifest(
   }));
   if (regionalForecast) fillerItems.unshift(regionalWeatherItem(regionalForecast));
 
-  const items = interleaveRotation(advertisements, hostItems, fillerItems);
+  const items = insertNetworkIdents(
+    interleaveRotation(advertisements, hostItems, fillerItems),
+    `screen:${screen.id}`,
+  );
   const version = createHash("sha256")
     .update(JSON.stringify({
       screen: { id: screen.id, orientation: screen.orientation },

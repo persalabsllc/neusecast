@@ -15,10 +15,11 @@ import {
 import { selectBalancedFiller } from "@/lib/filler/selection";
 import { interleaveRotation } from "./playlist";
 import { getRegionalAlerts, getRegionalForecast, regionalWeatherItem } from "./weather";
+import { insertNetworkIdents } from "./idents";
 import type { PlayerItem, PlayerItemKind, PlayerManifest, PlayerTheme } from "./types";
 
 const THEMES = new Set<PlayerTheme>(["aqua", "navy", "coral", "gold", "blue", "green"]);
-const KINDS = new Set<PlayerItemKind>(["advertisement", "host", "weather", "news", "event", "history", "trivia", "community"]);
+const KINDS = new Set<PlayerItemKind>(["advertisement", "host", "weather", "news", "event", "history", "trivia", "community", "ident"]);
 
 function metadataString(metadata: Record<string, unknown> | null, key: string) {
   const value = metadata?.[key];
@@ -147,7 +148,10 @@ export async function getNetworkChannelManifest(): Promise<PlayerManifest> {
   if (regionalForecast) fillerItems.unshift(regionalWeatherItem(regionalForecast));
 
   // Venue-specific host posts are deliberately excluded from the public channel.
-  const items = interleaveRotation(advertisements, [], fillerItems);
+  const items = insertNetworkIdents(
+    interleaveRotation(advertisements, [], fillerItems),
+    "network-live",
+  );
   const version = createHash("sha256")
     .update(JSON.stringify({ alerts: regionalAlerts, items }))
     .digest("hex")

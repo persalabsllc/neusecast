@@ -1,4 +1,4 @@
-export type PlayerItemKind = "advertisement" | "host" | "weather" | "news" | "event" | "history" | "trivia" | "community";
+export type PlayerItemKind = "advertisement" | "host" | "weather" | "news" | "event" | "history" | "trivia" | "community" | "ident";
 
 export type PlayerTheme = "aqua" | "navy" | "coral" | "gold" | "blue" | "green";
 

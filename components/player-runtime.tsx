@@ -32,6 +32,7 @@ const kindLabels: Record<PlayerItem["kind"], string> = {
   history: "Local history",
   trivia: "Quick trivia",
   community: "Eastern Carolina",
+  ident: "NeuseCast Network",
 };
 
 function KindIcon({ kind }: { kind: PlayerItem["kind"] }) {
@@ -200,6 +201,55 @@ function NewsSignal() {
       <span className="player-news-signal-ring player-news-signal-ring-two" />
       <span className="player-news-signal-ring player-news-signal-ring-three" />
       <Newspaper />
+    </div>
+  );
+}
+
+function NetworkIdent({ variant }: { variant: string | null | undefined }) {
+  const identVariant = variant?.replace("network_ident_", "") ?? "combo";
+  const logo = (
+    <svg className="player-ident-logo" viewBox="0 0 120 120" role="img" aria-label="NeuseCast">
+      <rect x="13" y="14" width="94" height="78" rx="24" />
+      <path d="M29 67c10 0 10-18 20-18s10 18 20 18 10-18 20-18" />
+      <path d="M47 105h26" />
+    </svg>
+  );
+
+  if (identVariant === "logo") {
+    return (
+      <div className="player-ident player-ident-logo-sting">
+        <div className="player-ident-rings" aria-hidden="true"><i /><i /><i /></div>
+        {logo}
+        <strong>NeuseCast</strong>
+        <span>Local screens, connected.</span>
+      </div>
+    );
+  }
+
+  if (identVariant === "network") {
+    return (
+      <div className="player-ident player-ident-network-id">
+        <div className="player-ident-scan" aria-hidden="true" />
+        <span>This is the</span>
+        <h1>NeuseCast<br />TV Network</h1>
+        <p>Serving Eastern North Carolina</p>
+        <strong>NeuseCast.com</strong>
+      </div>
+    );
+  }
+
+  return (
+    <div className="player-ident player-ident-combo">
+      <div className="player-ident-network-lines" aria-hidden="true">
+        <i /><i /><i /><i /><i />
+      </div>
+      <div className="player-ident-combo-mark">{logo}</div>
+      <div className="player-ident-combo-copy">
+        <span>Eastern North Carolina&apos;s</span>
+        <h1>NeuseCast<br />TV Network</h1>
+        <p>Local screens, connected.</p>
+        <strong>NeuseCast.com</strong>
+      </div>
     </div>
   );
 }
@@ -522,6 +572,7 @@ export function PlayerRuntime({
   const currentItem = playableItems[displayedIndex] ?? null;
   const isNews = currentItem?.kind === "news";
   const isWeather = currentItem?.kind === "weather";
+  const isIdent = currentItem?.kind === "ident";
   const hasMedia = Boolean(currentItem?.mediaUrl);
   const isEditorialPhoto = Boolean(
     currentItem?.source === "generated_content"
@@ -980,7 +1031,9 @@ export function PlayerRuntime({
       </header>
 
       <section className={`player-slide player-slide-${currentItem.kind}`} key={currentItem.id}>
-        {isWeather ? (
+        {isIdent ? (
+          <NetworkIdent variant={currentItem.contentCategory} />
+        ) : isWeather ? (
           <WeatherBroadcast item={currentItem} location="Eastern North Carolina" />
         ) : (
           <>
