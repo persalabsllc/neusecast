@@ -2,6 +2,7 @@ import type Stripe from "stripe";
 import { and, eq, ne, sql } from "drizzle-orm";
 import { getDatabase } from "@/lib/db";
 import { campaignOrders } from "@/lib/db/schema";
+import { getMediaPlan, planIncludesRadio } from "@/lib/pricing";
 import { getStripe } from "@/lib/stripe";
 import { nextBroadcastMorning } from "@/lib/time-zone";
 
@@ -32,6 +33,7 @@ async function fulfillCheckout(session: Stripe.Checkout.Session, eventCreated: n
       id: campaignOrders.id,
       campaignId: campaignOrders.campaignId,
       advertiserAccountId: campaignOrders.advertiserAccountId,
+      planKey: campaignOrders.planKey,
       amountCents: campaignOrders.amountCents,
       currency: campaignOrders.currency,
     })
@@ -43,8 +45,18 @@ async function fulfillCheckout(session: Stripe.Checkout.Session, eventCreated: n
     .limit(1);
   if (!order) return;
 
+  const plan = getMediaPlan(order.planKey);
+  const checkoutPlanMatches = session.metadata?.planKey === order.planKey
+    || (!session.metadata?.planKey && order.planKey === "screens");
+
   if (
-    session.client_reference_id !== order.id
+    !plan
+    || !checkoutPlanMatches
+    || order.amountCents !== plan.amountCents
+    || order.currency !== plan.currency
+    || session.client_reference_id !== order.id
+    || session.metadata?.campaignId !== order.campaignId
+    || session.metadata?.advertiserAccountId !== order.advertiserAccountId
     || session.amount_total !== order.amountCents
     || session.currency?.toUpperCase() !== order.currency.toUpperCase()
   ) {
@@ -110,6 +122,7 @@ async function fulfillCheckout(session: Stripe.Checkout.Session, eventCreated: n
         stripe_customer_id = ${customerId},
         stripe_subscription_id = ${subscriptionId},
         subscription_status = 'active',
+        subscription_plan_key = ${plan.key},
         stripe_event_created_at = ${paidAt},
         updated_at = ${paidAt}
       FROM fulfillment_context AS context
@@ -235,13 +248,24 @@ async function fulfillCheckout(session: Stripe.Checkout.Session, eventCreated: n
       INNER JOIN screens AS screen ON screen.active = TRUE
       ON CONFLICT (campaign_id, screen_id) DO NOTHING
       RETURNING campaign_id
+    ),
+    radio_brief_state AS (
+      UPDATE advertiser_radio_briefs AS brief
+      SET status = 'submitted'::radio_brief_status, updated_at = ${paidAt}
+      FROM eligible_context AS context
+      WHERE brief.advertiser_account_id = context.advertiser_account_id
+        AND brief.campaign_id = context.campaign_id
+        AND brief.status = 'pending_payment'::radio_brief_status
+        AND ${planIncludesRadio(plan)} = TRUE
+      RETURNING brief.id
     )
     SELECT
       (SELECT COUNT(*)::integer FROM paid_order) AS order_count,
       (SELECT COUNT(*)::integer FROM account_state) AS account_count,
       (SELECT COUNT(*)::integer FROM campaign_state) AS campaign_count,
       (SELECT COUNT(*)::integer FROM creative_state) AS creative_count,
-      (SELECT COUNT(*)::integer FROM screen_state) AS screen_count
+      (SELECT COUNT(*)::integer FROM screen_state) AS screen_count,
+      (SELECT COUNT(*)::integer FROM radio_brief_state) AS radio_brief_count
   `);
 }
 
@@ -299,10 +323,19 @@ async function cancelSubscription(subscription: Stripe.Subscription, eventCreate
           'active'::campaign_status
         )
       RETURNING campaign.id
+    ),
+    radio_brief_state AS (
+      UPDATE advertiser_radio_briefs AS brief
+      SET status = 'retired'::radio_brief_status, updated_at = ${changedAt}
+      FROM account_state AS accounts
+      WHERE brief.advertiser_account_id = accounts.id
+        AND brief.status <> 'retired'::radio_brief_status
+      RETURNING brief.id
     )
     SELECT
       (SELECT COUNT(*)::integer FROM account_state) AS account_count,
-      (SELECT COUNT(*)::integer FROM campaign_state) AS campaign_count
+      (SELECT COUNT(*)::integer FROM campaign_state) AS campaign_count,
+      (SELECT COUNT(*)::integer FROM radio_brief_state) AS radio_brief_count
   `);
 }
 
@@ -388,6 +421,7 @@ async function setSubscriptionPaymentState(invoice: Stripe.Invoice, paid: boolea
           OR accounts.stripe_event_created_at <= ${changedAt}
         )
         AND accounts.subscription_status <> 'canceled'
+        AND accounts.subscription_plan_key IS NOT NULL
       RETURNING accounts.id
     ),
     campaign_state AS (

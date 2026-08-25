@@ -1,3 +1,4 @@
+import type Stripe from "stripe";
 import { and, desc, eq, inArray, isNotNull, isNull, ne } from "drizzle-orm";
 import { getDatabase } from "@/lib/db";
 import {
@@ -6,7 +7,7 @@ import {
   campaigns,
 } from "@/lib/db/schema";
 import { getApplicationUrl, getStripe } from "@/lib/stripe";
-import { NEUSECAST_PLAN } from "@/lib/pricing";
+import { getMediaPlan, type MediaPlan } from "@/lib/pricing";
 
 export class BillingError extends Error {
   constructor(
@@ -34,6 +35,22 @@ const EXISTING_SUBSCRIPTION_STATUSES = new Set([
   "incomplete",
 ]);
 
+function checkoutSessionMatchesOrder(
+  session: Stripe.Checkout.Session,
+  order: { id: string; campaignId: string; advertiserAccountId: string; amountCents: number; currency: string; planKey: string },
+  plan: MediaPlan,
+) {
+  return session.mode === "subscription"
+    && session.client_reference_id === order.id
+    && session.amount_total === order.amountCents
+    && order.amountCents === plan.amountCents
+    && session.currency?.toUpperCase() === order.currency.toUpperCase()
+    && session.metadata?.orderId === order.id
+    && session.metadata?.campaignId === order.campaignId
+    && session.metadata?.advertiserAccountId === order.advertiserAccountId
+    && session.metadata?.planKey === plan.key;
+}
+
 export async function createCampaignCheckout(orderId: string, clerkUserId: string) {
   const database = getDatabase();
 
@@ -42,6 +59,7 @@ export async function createCampaignCheckout(orderId: string, clerkUserId: strin
       id: campaignOrders.id,
       status: campaignOrders.status,
       stripeCheckoutSessionId: campaignOrders.stripeCheckoutSessionId,
+      planKey: campaignOrders.planKey,
       amountCents: campaignOrders.amountCents,
       currency: campaignOrders.currency,
       campaignId: campaigns.id,
@@ -69,12 +87,13 @@ export async function createCampaignCheckout(orderId: string, clerkUserId: strin
   if (order.status === "cancelled" || order.status === "refunded") {
     throw new BillingError("This campaign order is no longer payable.", 409);
   }
-  if (order.amountCents !== NEUSECAST_PLAN.amountCents || order.currency !== NEUSECAST_PLAN.currency) {
+  const plan = getMediaPlan(order.planKey);
+  if (!plan || order.amountCents !== plan.amountCents || order.currency !== plan.currency) {
     throw new BillingError("Campaign subscription price is invalid.", 400);
   }
 
   if (hasActiveAdvertiserSubscription(order.subscriptionStatus)) {
-    throw new BillingError("Your $75 monthly NeuseCast plan is already active. Return to the advertiser dashboard to add a campaign.", 409);
+    throw new BillingError("Your monthly NeuseCast plan is already active. Return to the advertiser dashboard to add a campaign.", 409);
   }
   if (requiresAdvertiserBillingAction(order.subscriptionStatus)) {
     throw new BillingError("Your existing subscription needs attention. Use Manage billing before creating another checkout.", 409);
@@ -101,7 +120,12 @@ export async function createCampaignCheckout(orderId: string, clerkUserId: strin
 
   if (order.stripeCheckoutSessionId) {
     const existingSession = await stripe.checkout.sessions.retrieve(order.stripeCheckoutSessionId);
-    if (existingSession.status === "open" && existingSession.url) return existingSession.url;
+    if (existingSession.status === "open") {
+      if (existingSession.url && checkoutSessionMatchesOrder(existingSession, order, plan)) {
+        return existingSession.url;
+      }
+      await stripe.checkout.sessions.expire(existingSession.id);
+    }
     if (
       existingSession.status === "complete"
       && (order.status !== "failed" || existingSession.payment_status === "paid")
@@ -128,7 +152,9 @@ export async function createCampaignCheckout(orderId: string, clerkUserId: strin
   for (const pendingOrder of pendingOrders) {
     if (!pendingOrder.stripeCheckoutSessionId) continue;
     const pendingSession = await stripe.checkout.sessions.retrieve(pendingOrder.stripeCheckoutSessionId);
-    if (pendingSession.status === "open" && pendingSession.url) return pendingSession.url;
+    if (pendingSession.status === "open") {
+      await stripe.checkout.sessions.expire(pendingSession.id);
+    }
   }
 
   if (!customerId) {
@@ -164,11 +190,11 @@ export async function createCampaignCheckout(orderId: string, clerkUserId: strin
           quantity: 1,
           price_data: {
             currency: order.currency.toLowerCase(),
-            unit_amount: NEUSECAST_PLAN.amountCents,
-            recurring: { interval: NEUSECAST_PLAN.interval },
+            unit_amount: plan.amountCents,
+            recurring: { interval: plan.interval },
             product_data: {
-              name: NEUSECAST_PLAN.name,
-              description: "NeuseCast advertising on every active network screen, billed monthly.",
+              name: plan.name,
+              description: plan.description,
             },
           },
         },
@@ -177,12 +203,14 @@ export async function createCampaignCheckout(orderId: string, clerkUserId: strin
         orderId: order.id,
         campaignId: order.campaignId,
         advertiserAccountId: order.advertiserAccountId,
+        planKey: plan.key,
       },
       subscription_data: {
         metadata: {
           orderId: order.id,
           campaignId: order.campaignId,
           advertiserAccountId: order.advertiserAccountId,
+          planKey: plan.key,
         },
       },
       success_url: `${applicationUrl}/advertiser/checkout/success?session_id={CHECKOUT_SESSION_ID}`,

@@ -6,6 +6,7 @@ import { ensureScreenManagementSchema } from "@/lib/db/ensure-screen-management"
 import { getDatabase } from "@/lib/db";
 import { advertiserAccounts, campaigns, creatives, newsroomStories, playbackEvents, screens, venues } from "@/lib/db/schema";
 import { deriveScreenHealth, type ScreenHealth } from "@/lib/player/health";
+import { mediaPlanOrDefault } from "@/lib/pricing";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,7 @@ export default async function ControlDashboard() {
     db.select({ id: screens.id, name: screens.name, status: screens.status, active: screens.active, lastHeartbeatAt: screens.lastHeartbeatAt, playerKey: screens.providerScreenId, venue: venues.name, city: venues.city }).from(screens).innerJoin(venues, eq(screens.venueId, venues.id)).orderBy(desc(screens.createdAt)),
     db.select({ status: campaigns.status, endsAt: campaigns.endsAt, billingPaused: campaigns.billingPaused, advertiserActive: advertiserAccounts.active, subscriptionStatus: advertiserAccounts.subscriptionStatus }).from(campaigns).innerJoin(advertiserAccounts, eq(campaigns.advertiserAccountId, advertiserAccounts.id)),
     db.select({ status: creatives.status, billingPaused: campaigns.billingPaused, advertiserActive: advertiserAccounts.active, subscriptionStatus: advertiserAccounts.subscriptionStatus }).from(creatives).innerJoin(campaigns, eq(creatives.campaignId, campaigns.id)).innerJoin(advertiserAccounts, eq(campaigns.advertiserAccountId, advertiserAccounts.id)),
-    db.select({ active: advertiserAccounts.active, subscriptionStatus: advertiserAccounts.subscriptionStatus }).from(advertiserAccounts),
+    db.select({ active: advertiserAccounts.active, subscriptionStatus: advertiserAccounts.subscriptionStatus, subscriptionPlanKey: advertiserAccounts.subscriptionPlanKey }).from(advertiserAccounts),
     db.select({ id: playbackEvents.id }).from(playbackEvents),
     db.select({ total: count(newsroomStories.id) }).from(newsroomStories).where(eq(newsroomStories.status, "review")),
   ]);
@@ -63,14 +64,18 @@ export default async function ControlDashboard() {
     && !creative.billingPaused
     && creative.status === "review"
   )).length;
-  const activeSubscriptions = advertiserRows.filter((advertiser) => advertiser.active && advertiser.subscriptionStatus === "active").length;
-  const monthlyRecurringRevenue = activeSubscriptions * 7_500;
+  const entitledAdvertisers = advertiserRows.filter((advertiser) => advertiser.active && advertiser.subscriptionStatus === "active");
+  const activeSubscriptions = entitledAdvertisers.length;
+  const monthlyRecurringRevenue = entitledAdvertisers.reduce(
+    (total, advertiser) => total + mediaPlanOrDefault(advertiser.subscriptionPlanKey).amountCents,
+    0,
+  );
   const firstPlayer = activeScreens.find((screen) => screen.playerKey)?.playerKey;
   const metrics = [
     { label: "Screens online", value: `${onlineScreens.length} / ${activeScreens.length}`, detail: attentionScreens.length ? `${attentionScreens.length} need attention` : "All active screens reporting", icon: MonitorCheck, tone: "teal" },
     { label: "Live + scheduled campaigns", value: String(activeCampaigns), detail: `${reviewCount} creative${reviewCount === 1 ? "" : "s"} awaiting approval`, icon: Megaphone, tone: "coral" },
     { label: "Verified plays", value: playRows.length.toLocaleString(), detail: "Recorded player events", icon: Radio, tone: "blue" },
-    { label: "Monthly recurring revenue", value: `$${(monthlyRecurringRevenue / 100).toLocaleString()}`, detail: `${activeSubscriptions} active subscription${activeSubscriptions === 1 ? "" : "s"} · $75 each`, icon: DollarSign, tone: "gold" },
+    { label: "Monthly recurring revenue", value: `$${(monthlyRecurringRevenue / 100).toLocaleString()}`, detail: `${activeSubscriptions} active subscription${activeSubscriptions === 1 ? "" : "s"} across all plans`, icon: DollarSign, tone: "gold" },
   ] as const;
 
   return <div className="dashboard-page">

@@ -1,9 +1,9 @@
 import { count, countDistinct, desc, eq, inArray } from "drizzle-orm";
-import { BadgeCheck, Ban, BarChart3, CalendarClock, CircleDollarSign, Eye, House, Megaphone, Pause, Play, ShieldCheck } from "lucide-react";
+import { BadgeCheck, Ban, BarChart3, CalendarClock, Eye, House, Megaphone, Pause, Play, Radio, ShieldCheck } from "lucide-react";
 import { CampaignBuilder } from "@/components/campaign-builder";
 import { getDatabase } from "@/lib/db";
-import { advertiserAccounts, campaigns, creatives, playbackEvents } from "@/lib/db/schema";
-import { NEUSECAST_MONTHLY_PRICE } from "@/lib/pricing";
+import { advertiserAccounts, advertiserRadioBriefs, campaigns, creatives, playbackEvents } from "@/lib/db/schema";
+import { mediaPlanOrDefault } from "@/lib/pricing";
 import { approveCreative, createHouseAdvertisement, pauseCampaign, rejectCreative, resumeCampaign } from "./actions";
 
 const houseAdKindLabels: Record<string, string> = {
@@ -25,7 +25,7 @@ export default async function CampaignsPage({ searchParams }: {
   searchParams: Promise<{ houseCreated?: string; houseError?: string }>;
 }) {
   const database = getDatabase();
-  const [query, reviewRows, campaignRoster, results] = await Promise.all([
+  const [query, reviewRows, campaignRoster, results, radioBriefRows] = await Promise.all([
     searchParams,
     database.select({
       creativeId: creatives.id,
@@ -39,6 +39,7 @@ export default async function CampaignsPage({ searchParams }: {
       createdAt: creatives.createdAt,
       advertiserActive: advertiserAccounts.active,
       subscriptionStatus: advertiserAccounts.subscriptionStatus,
+      subscriptionPlanKey: advertiserAccounts.subscriptionPlanKey,
       billingPaused: campaigns.billingPaused,
     }).from(creatives).innerJoin(campaigns, eq(creatives.campaignId, campaigns.id)).innerJoin(advertiserAccounts, eq(campaigns.advertiserAccountId, advertiserAccounts.id)).where(eq(creatives.status, "review")).orderBy(desc(creatives.createdAt)),
     database.select({
@@ -49,10 +50,23 @@ export default async function CampaignsPage({ searchParams }: {
       startsAt: campaigns.startsAt,
       advertiserActive: advertiserAccounts.active,
       subscriptionStatus: advertiserAccounts.subscriptionStatus,
+      subscriptionPlanKey: advertiserAccounts.subscriptionPlanKey,
       billingPaused: campaigns.billingPaused,
       targeting: campaigns.targeting,
     }).from(campaigns).innerJoin(advertiserAccounts, eq(campaigns.advertiserAccountId, advertiserAccounts.id)).where(inArray(campaigns.status, ["payment_pending", "scheduled", "active", "paused"])).orderBy(desc(campaigns.createdAt)),
     database.select({ campaignId: playbackEvents.campaignId, plays: count(playbackEvents.id), screens: countDistinct(playbackEvents.screenId) }).from(playbackEvents).groupBy(playbackEvents.campaignId),
+    database.select({
+      id: advertiserRadioBriefs.id,
+      businessName: advertiserAccounts.businessName,
+      status: advertiserRadioBriefs.status,
+      messageFocus: advertiserRadioBriefs.messageFocus,
+      destination: advertiserRadioBriefs.destination,
+      pronunciationNotes: advertiserRadioBriefs.pronunciationNotes,
+      preferredTone: advertiserRadioBriefs.preferredTone,
+      updatedAt: advertiserRadioBriefs.updatedAt,
+      subscriptionStatus: advertiserAccounts.subscriptionStatus,
+      subscriptionPlanKey: advertiserAccounts.subscriptionPlanKey,
+    }).from(advertiserRadioBriefs).innerJoin(advertiserAccounts, eq(advertiserRadioBriefs.advertiserAccountId, advertiserAccounts.id)).where(inArray(advertiserRadioBriefs.status, ["submitted", "in_production", "approved", "active"])).orderBy(desc(advertiserRadioBriefs.updatedAt)),
   ]);
   const resultMap = new Map(results.map((row) => [row.campaignId, row]));
   const eligibleReviews = reviewRows.filter((creative) => creative.advertiserActive && creative.subscriptionStatus === "active" && !creative.billingPaused).length;
@@ -65,7 +79,7 @@ export default async function CampaignsPage({ searchParams }: {
         <article className="metric-card"><span className="metric-icon metric-icon-coral"><ShieldCheck size={18} aria-hidden="true" /></span><div><p className="metric-label">Creative to review</p><p className="metric-value">{reviewRows.length}</p><p className="metric-detail">{eligibleReviews} eligible · {reviewRows.length - eligibleReviews} billing hold</p></div></article>
         <article className="metric-card"><span className="metric-icon metric-icon-green"><Megaphone size={18} aria-hidden="true" /></span><div><p className="metric-label">Live or queued</p><p className="metric-value">{activeCount}</p><p className="metric-detail">Across all active screens</p></div></article>
         <article className="metric-card"><span className="metric-icon metric-icon-blue"><BarChart3 size={18} aria-hidden="true" /></span><div><p className="metric-label">Verified plays</p><p className="metric-value">{results.reduce((sum, row) => sum + row.plays, 0).toLocaleString()}</p><p className="metric-detail">Proof of play</p></div></article>
-        <article className="metric-card"><span className="metric-icon metric-icon-violet"><CircleDollarSign size={18} aria-hidden="true" /></span><div><p className="metric-label">Standard plan</p><p className="metric-value">{NEUSECAST_MONTHLY_PRICE}</p><p className="metric-detail">All-screen advertiser plan</p></div></article>
+        <article className="metric-card"><span className="metric-icon metric-icon-violet"><Radio size={18} aria-hidden="true" /></span><div><p className="metric-label">Radio briefs</p><p className="metric-value">{radioBriefRows.length}</p><p className="metric-detail">Paid underwriting work queue</p></div></article>
       </section>
 
       {query.houseCreated ? <div className="success-banner">House advertisement published and assigned to every active screen.</div> : null}
@@ -77,6 +91,11 @@ export default async function CampaignsPage({ searchParams }: {
           <CampaignBuilder action={createHouseAdvertisement} mode="house" />
         </div>
       </details>
+
+      <section className="panel campaign-review-panel">
+        <div className="section-title-row"><div><span>Captain 97.1 underwriting</span><h2>Radio brief queue</h2></div><p>Briefs enter this queue only after Stripe confirms an eligible media-plan payment.</p></div>
+        {radioBriefRows.length === 0 ? <div className="control-empty"><Radio size={24} aria-hidden="true" /><strong>Radio queue is clear.</strong><span>Paid Hear It + See It and Local Dominance briefs will appear here.</span></div> : <div className="paid-campaign-table">{radioBriefRows.map((brief) => { const plan = mediaPlanOrDefault(brief.subscriptionPlanKey); return <article key={brief.id}><div><span className={`status-badge status-${brief.status === "active" ? "active" : brief.status === "approved" ? "approved" : "scheduled"}`}>{brief.status.replaceAll("_", " ")}</span><span className={`status-badge status-${brief.subscriptionStatus === "active" ? "active" : "payment_pending"}`}>Billing {brief.subscriptionStatus.replaceAll("_", " ")}</span><h3>{brief.businessName} · {plan.name}</h3><p>{brief.messageFocus}</p></div><dl><div><dt><Radio size={14} /> Monthly acknowledgments</dt><dd>{plan.radioAcknowledgmentsPerMonth}</dd></div><div><dt>Destination</dt><dd>{brief.destination}</dd></div><div><dt>Production notes</dt><dd>{[brief.preferredTone, brief.pronunciationNotes].filter(Boolean).join(" · ") || "No additional notes"}</dd></div></dl><small>Updated {brief.updatedAt.toLocaleString("en-US", { timeZone: "America/New_York" })}</small></article>; })}</div>}
+      </section>
 
       <section className="panel campaign-review-panel">
         <div className="section-title-row"><div><span>Moderation queue</span><h2>Creative awaiting review</h2></div><p>Approving makes the newest creative eligible at its scheduled start. Rejecting keeps it off every player.</p></div>
@@ -93,7 +112,7 @@ export default async function CampaignsPage({ searchParams }: {
 
       <section className="panel campaign-review-panel">
         <div className="section-title-row"><div><span>Delivery</span><h2>Campaign roster</h2></div><p>Campaign status is editorial. Billing entitlement is shown independently and enforced by every player.</p></div>
-        <div className="paid-campaign-table">{campaignRoster.map((campaign) => { const result = resultMap.get(campaign.id); const houseAd = campaign.targeting?.houseAd; const entitled = campaign.advertiserActive && campaign.subscriptionStatus === "active" && !campaign.billingPaused; const displayBusiness = houseAd?.sponsor || campaign.businessName; return <article key={campaign.id}><div><span className={`status-badge status-${campaign.status}`}>{campaign.status}</span>{houseAd ? <><span className="status-badge status-active">House ad</span><span className="status-badge status-approved">{houseAdKindLabels[houseAd.kind] ?? "Internal"}</span></> : <span className={`status-badge status-${entitled ? "active" : "payment_pending"}`}>{entitled ? "Billing active" : `Billing ${campaign.subscriptionStatus.replaceAll("_", " ")}`}</span>}{campaign.billingPaused ? <span className="status-badge status-payment_pending">Automated hold</span> : null}<h3>{displayBusiness} · {campaign.name}</h3></div><dl><div><dt><CalendarClock size={14} /> Start</dt><dd>{campaign.startsAt ? campaign.startsAt.toLocaleDateString("en-US", { timeZone: "America/New_York" }) : houseAd ? "Immediately" : "After payment"}</dd></div><div><dt><Eye size={14} /> Results</dt><dd>{result ? `${result.plays} plays · ${result.screens} screens` : "No plays yet"}</dd></div></dl><form action={campaign.status === "paused" ? resumeCampaign : pauseCampaign}><input type="hidden" name="campaignId" value={campaign.id} /><button className="button button-secondary button-small" disabled={campaign.billingPaused}>{campaign.status === "paused" ? <><Play size={14} /> Resume</> : <><Pause size={14} /> Pause</>}</button></form></article>; })}</div>
+        <div className="paid-campaign-table">{campaignRoster.map((campaign) => { const result = resultMap.get(campaign.id); const houseAd = campaign.targeting?.houseAd; const entitled = campaign.advertiserActive && campaign.subscriptionStatus === "active" && !campaign.billingPaused; const displayBusiness = houseAd?.sponsor || campaign.businessName; const plan = mediaPlanOrDefault(campaign.subscriptionPlanKey); return <article key={campaign.id}><div><span className={`status-badge status-${campaign.status}`}>{campaign.status}</span>{houseAd ? <><span className="status-badge status-active">House ad</span><span className="status-badge status-approved">{houseAdKindLabels[houseAd.kind] ?? "Internal"}</span></> : <><span className={`status-badge status-${entitled ? "active" : "payment_pending"}`}>{entitled ? "Billing active" : `Billing ${campaign.subscriptionStatus.replaceAll("_", " ")}`}</span><span className="status-badge status-approved">{plan.name}</span></>}{campaign.billingPaused ? <span className="status-badge status-payment_pending">Automated hold</span> : null}<h3>{displayBusiness} · {campaign.name}</h3></div><dl><div><dt><CalendarClock size={14} /> Start</dt><dd>{campaign.startsAt ? campaign.startsAt.toLocaleDateString("en-US", { timeZone: "America/New_York" }) : houseAd ? "Immediately" : "After payment"}</dd></div><div><dt><Eye size={14} /> Results</dt><dd>{result ? `${result.plays} plays · ${result.screens} screens` : "No plays yet"}</dd></div></dl><form action={campaign.status === "paused" ? resumeCampaign : pauseCampaign}><input type="hidden" name="campaignId" value={campaign.id} /><button className="button button-secondary button-small" disabled={campaign.billingPaused}>{campaign.status === "paused" ? <><Play size={14} /> Resume</> : <><Pause size={14} /> Pause</>}</button></form></article>; })}</div>
       </section>
     </div>
   );

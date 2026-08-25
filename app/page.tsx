@@ -7,7 +7,6 @@ import {
   CalendarClock,
   Check,
   ChevronRight,
-  Layers3,
   MapPin,
   MonitorPlay,
   Palette,
@@ -20,9 +19,9 @@ import { NEUSECAST_CONTACT } from "@/lib/legal";
 import { submitHostApplication } from "./host-application/actions";
 
 export const metadata: Metadata = {
-  title: "Advertise Across 75+ Eastern North Carolina Locations",
+  title: "Local Screen Advertising Across Eastern North Carolina",
   description:
-    "NeuseCast is deployed in 75+ Eastern North Carolina locations. Advertise for $75/month with 12 verified plays per active, compatible screen each broadcast day.",
+    "Advertise across NeuseCast's growing Eastern North Carolina screen network, or pair screens with Captain 97.1 underwriting for broader local reach.",
 };
 
 const advertiserBenefits = [
@@ -68,9 +67,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ h
           <div className="sales-nav-links">
             <Link href="/watch">Watch Live</Link>
             <a href="#advertisers">Advertise</a>
+            <Link href="/media">Media options</Link>
             <a href="#how-it-works">How it works</a>
             <a href="#hosts">Host a screen</a>
-            <a href="#network">Network reach</a>
             <Link href="/contact">Contact</Link>
           </div>
 
@@ -79,7 +78,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ h
 
       <section className="sales-hero sales-container">
         <div className="sales-hero-copy">
-          <div className="eyebrow">75+ locations across Eastern North Carolina</div>
+          <div className="eyebrow">A growing Eastern North Carolina screen network</div>
           <h1>Put your business where local customers already are.</h1>
           <p>
             NeuseCast delivers polished digital advertising across professionally
@@ -88,7 +87,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ h
             for clicks or fighting social algorithms.
           </p>
           <div className="button-row">
-            <Link className="button button-primary" href="/advertiser/new">
+            <Link className="button button-primary" href="/advertiser/new?plan=screens">
             Preview your ad · $75/mo <ArrowRight size={17} aria-hidden="true" />
             </Link>
             <a className="button button-secondary" href="#how-it-works">
@@ -98,8 +97,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ h
           <div className="sales-local-note">
             <Radio size={16} aria-hidden="true" />
             <span>
-              NeuseCast and <a href="https://captain97.com" target="_blank" rel="noreferrer">Captain 97.1</a> are
-              jointly owned and operated sister media companies serving Eastern North Carolina.
+              NeuseCast and <a href="https://www.captain97.com" target="_blank" rel="noreferrer">Captain 97.1</a> are
+              jointly owned local media companies. <Link href="/media">Explore screen + radio plans.</Link>
             </span>
           </div>
         </div>
@@ -126,15 +125,15 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ h
             <Store size={15} aria-hidden="true" /> Restaurants &amp; shops
           </div>
           <div className="sales-placement-card sales-placement-two">
-            <MapPin size={15} aria-hidden="true" /> 75+ locations
+            <MapPin size={15} aria-hidden="true" /> Growing local network
           </div>
         </div>
       </section>
 
       <section className="sales-value-strip sales-container" aria-label="Why NeuseCast">
         <article>
-          <strong>75+ locations</strong>
-          <span>Deployed throughout Eastern North Carolina.</span>
+          <strong>Growing network</strong>
+          <span>New Eastern North Carolina venues are added as locations qualify.</span>
         </article>
         <article>
           <strong>12 verified plays</strong>
@@ -145,8 +144,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ h
           <span>Refresh offers, events, and seasonal messages remotely.</span>
         </article>
         <article>
-            <strong>$75/month</strong>
-          <span>One transparent all-screen plan.</span>
+          <strong>From $75/month</strong>
+          <span>Screen-only and screen + radio options.</span>
         </article>
       </section>
 
@@ -158,8 +157,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ h
           </div>
           <p>
             NeuseCast combines the visibility of out-of-home advertising with the
-            speed and flexibility of digital media across more than 75 deployed
-            locations throughout Eastern North Carolina.
+            speed and flexibility of digital media across a growing network of
+            qualified Eastern North Carolina host locations.
           </p>
         </div>
 
@@ -189,7 +188,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ h
           <span>ALL-SCREEN PLAN</span>
           <strong><small>$</small>75<em>/month</em></strong>
           <p>Paid campaigns enter the following day’s paced broadcast schedule, subject to a fast content review.</p>
-          <Link className="button button-primary" href="/advertiser/new">Create your campaign <ArrowRight size={17} aria-hidden="true" /></Link>
+          <Link className="button button-primary" href="/advertiser/new?plan=screens">Create your campaign <ArrowRight size={17} aria-hidden="true" /></Link>
+          <small><Link className="text-link" href="/media">Compare TV + Captain 97.1 plans <ArrowRight size={14} aria-hidden="true" /></Link></small>
           <small>Secure recurring billing powered by Stripe.</small>
         </div>
       </section>
@@ -276,25 +276,24 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ h
         </div>
       </section>
 
-      <section className="sales-launch sales-container" id="network">
+      <section className="sales-launch sales-container" id="media-options">
         <div className="sales-launch-mark" aria-hidden="true">
-          <Layers3 size={30} />
+          <Radio size={30} />
         </div>
         <div>
-          <div className="eyebrow">Established regional reach</div>
-          <h2>Deployed in 75+ locations across Eastern North Carolina.</h2>
+          <div className="eyebrow">NeuseCast + Captain 97.1</div>
+          <h2>Put your business on local screens and local radio.</h2>
           <p>
-            NeuseCast screens are installed in the restaurants, shops, waiting rooms,
-            gyms, and community businesses people visit every day. Approved campaigns
-            run across every active, compatible screen, with verified proof-of-play
-            reporting included.
+            Start with NeuseCast screens or pair your visual campaign with compliant
+            underwriting acknowledgments on Captain 97.1. One local team coordinates
+            both messages while each medium does what it does best.
           </p>
         </div>
         <div className="sales-launch-actions">
-          <Link className="button button-primary" href="/advertiser/new">
-            Build a $75 campaign <ArrowRight size={17} aria-hidden="true" />
+          <Link className="button button-primary" href="/media">
+            View media options <ArrowRight size={17} aria-hidden="true" />
           </Link>
-          <a className="button button-secondary" href="#hosts">Host a NeuseCast screen</a>
+          <a className="button button-secondary" href="https://www.captain97.com/underwriting" target="_blank" rel="noreferrer">About radio underwriting</a>
         </div>
       </section>
 
@@ -332,6 +331,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ h
           <div className="sales-footer-links">
             <Link href="/watch">Watch Live</Link>
             <a href="#advertisers">Advertise</a>
+            <Link href="/media">Media options</Link>
+            <a href="https://www.captain97.com/underwriting" target="_blank" rel="noreferrer">Captain 97.1</a>
             <a href="#hosts">Host a screen</a>
             <Link href="/advertiser">Advertiser login</Link>
             <Link href="/host">Host login</Link>

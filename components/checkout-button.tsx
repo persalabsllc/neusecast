@@ -3,7 +3,13 @@
 import { useState } from "react";
 import { CreditCard, LoaderCircle } from "lucide-react";
 
-export function CheckoutButton({ orderId }: { orderId: string }) {
+const monthlyCurrency = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  maximumFractionDigits: 0,
+});
+
+export function CheckoutButton({ orderId, planName, amountCents }: { orderId: string; planName: string; amountCents: number }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -34,7 +40,7 @@ export function CheckoutButton({ orderId }: { orderId: string }) {
     <div className="checkout-action">
       <button className="button button-primary" type="button" onClick={beginCheckout} disabled={loading}>
         {loading ? <LoaderCircle className="spin" size={17} aria-hidden="true" /> : <CreditCard size={17} aria-hidden="true" />}
-        {loading ? "Opening secure checkout…" : "Subscribe for $75/month"}
+        {loading ? "Opening secure checkout…" : `Choose ${planName} · ${monthlyCurrency.format(amountCents / 100)}/month`}
       </button>
       {error ? <p role="alert">{error}</p> : null}
     </div>
