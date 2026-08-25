@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Brand } from "@/components/brand";
 import { NEUSECAST_CONTACT } from "@/lib/legal";
+import { submitHostApplication } from "./host-application/actions";
 
 export const metadata: Metadata = {
   title: "Advertise Across 75+ Eastern North Carolina Locations",
@@ -56,7 +57,8 @@ const hostBenefits = [
   "Automatic weather, events, trivia, and local-history content",
 ] as const;
 
-export default function Home() {
+export default async function Home({ searchParams }: { searchParams: Promise<{ hostApplication?: string }> }) {
+  const query = await searchParams;
   return (
     <main className="sales-page">
       <header className="sales-header">
@@ -237,23 +239,40 @@ export default function Home() {
             screen time for menus, specials, events, hiring messages, and customer
             announcements.
           </p>
-          <Link className="button button-secondary" href="/host">
-            Preview the host portal <ArrowRight size={17} aria-hidden="true" />
-          </Link>
+          <div className="host-inline-benefits">
+            {hostBenefits.slice(0, 4).map((benefit) => <span key={benefit}><Check size={14} aria-hidden="true" /> {benefit}</span>)}
+          </div>
           <small>
             Placement is subject to a location review, reliable power and internet,
             audience fit, and a host agreement.
           </small>
         </div>
 
-        <div className="host-benefit-panel">
-          <span className="host-benefit-icon"><MonitorPlay size={26} aria-hidden="true" /></span>
-          <h3>What host locations receive</h3>
-          <ul>
-            {hostBenefits.map((benefit) => (
-              <li key={benefit}><Check size={15} aria-hidden="true" /> {benefit}</li>
-            ))}
-          </ul>
+        <div className="host-application-panel">
+          <div className="host-application-heading">
+            <span className="host-benefit-icon"><MonitorPlay size={24} aria-hidden="true" /></span>
+            <div><p>Request a free screen</p><h3>Tell us about your location.</h3></div>
+          </div>
+          {query.hostApplication === "received" ? <div className="success-banner">Application received. Kyle will review your location and contact you directly.</div> : null}
+          {query.hostApplication === "error" ? <div className="form-error">Complete every required field and confirm the placement requirements.</div> : null}
+          <form action={submitHostApplication} className="host-application-form">
+            <label className="host-application-honeypot" aria-hidden="true">Fax number<input name="faxNumber" tabIndex={-1} autoComplete="off" /></label>
+            <label className="field field-wide"><span className="field-label">Business name</span><input name="businessName" maxLength={200} required autoComplete="organization" /></label>
+            <label className="field"><span className="field-label">Venue type</span><select name="venueType" defaultValue="" required><option value="" disabled>Select one</option><option value="Restaurant or cafe">Restaurant or cafe</option><option value="Retail store">Retail store</option><option value="Medical or professional waiting room">Medical or professional waiting room</option><option value="Gym, salon, or personal care">Gym, salon, or personal care</option><option value="Hotel or lodging">Hotel or lodging</option><option value="Entertainment venue">Entertainment venue</option><option value="Other public-facing business">Other public-facing business</option></select></label>
+            <label className="field"><span className="field-label">Estimated daily visitors</span><select name="dailyVisitors" defaultValue="" required><option value="" disabled>Select a range</option><option value="Under 50">Under 50</option><option value="50–100">50–100</option><option value="101–250">101–250</option><option value="251–500">251–500</option><option value="More than 500">More than 500</option></select></label>
+            <label className="field"><span className="field-label">Contact name</span><input name="contactName" maxLength={160} required autoComplete="name" /></label>
+            <label className="field"><span className="field-label">Email</span><input name="email" type="email" maxLength={320} required autoComplete="email" /></label>
+            <label className="field"><span className="field-label">Phone</span><input name="phone" type="tel" maxLength={40} required autoComplete="tel" /></label>
+            <label className="field"><span className="field-label">Website <small>optional</small></span><input name="websiteUrl" type="url" maxLength={500} placeholder="https://" autoComplete="url" /></label>
+            <label className="field field-wide"><span className="field-label">Street address</span><input name="addressLine1" maxLength={200} required autoComplete="street-address" /></label>
+            <label className="field"><span className="field-label">City</span><input name="city" maxLength={100} defaultValue="New Bern" required autoComplete="address-level2" /></label>
+            <label className="field host-application-state"><span className="field-label">State</span><input name="state" maxLength={2} defaultValue="NC" required autoComplete="address-level1" /></label>
+            <label className="field host-application-zip"><span className="field-label">ZIP</span><input name="postalCode" maxLength={12} required autoComplete="postal-code" /></label>
+            <label className="field field-wide"><span className="field-label">Why would a screen work well here? <small>optional</small></span><textarea name="notes" rows={3} maxLength={1500} placeholder="Tell us where it could be mounted and how long customers typically stay." /></label>
+            <label className="checkbox-field host-application-consent field-wide"><input name="acknowledged" value="yes" type="checkbox" required /><span>I understand placement depends on audience fit, reliable internet and power, available mounting space, and a host agreement.</span></label>
+            <button className="button button-primary field-wide" type="submit">Apply to host a free screen <ArrowRight size={17} aria-hidden="true" /></button>
+          </form>
+          <p className="host-application-existing">Already approved? <Link href="/host">Open the Host Workspace</Link></p>
         </div>
       </section>
 
