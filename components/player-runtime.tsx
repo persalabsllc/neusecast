@@ -148,22 +148,67 @@ function WeatherBroadcast({ item, location }: { item: PlayerItem; location: stri
           <p>{currentPeriod?.shortForecast ?? item.title}</p>
         </div>
         <div className="player-weather-map" aria-hidden="true">
-          <svg viewBox="0 0 820 430" role="img">
-            <title>Stylized Eastern North Carolina regional weather map</title>
-            <path className="player-weather-map-land" d="M42 50H550L615 82 602 118 654 148 625 181 682 212 645 250 702 286 662 326 711 365 675 408H42Z" />
-            <path className="player-weather-map-coast" d="M550 50 615 82 602 118 654 148 625 181 682 212 645 250 702 286 662 326 711 365 675 408" />
-            <path className="player-weather-map-river" d="M104 185C218 154 282 211 371 188S522 129 621 164" />
-            <g className="player-weather-map-band">
-              <path d="M-70 360C95 305 172 213 300 182S510 119 895 66" />
-              <path d="M-90 405C100 347 192 262 325 229S575 153 910 112" />
+          <svg viewBox="0 0 940 520" role="img">
+            <title>Cartoon-style map of Eastern North Carolina showing Greenville, Washington, Kinston, New Bern, Jacksonville, and Morehead City</title>
+            <path className="player-weather-map-land" d="M36 36H760l-23 36c-33-5-65-11-102-26 13 37 46 60 95 72-31 20-66 25-112 13l-61-29c13 42 44 73 96 85-28 20-61 27-105 15l-64-35c17 48 49 83 96 101-23 23-57 32-99 22l-65-39c16 51 53 92 106 111-15 21-32 33-56 39 56-3 105 7 155 26 27 11 54 15 89 17l36 18c-35 16-70 23-106 23-51 0-98-10-145-21l-75-17c-30 9-55 22-78 43H36Z" />
+            <path className="player-weather-map-coast" d="M760 36l-23 36c-33-5-65-11-102-26 13 37 46 60 95 72-31 20-66 25-112 13l-61-29c13 42 44 73 96 85-28 20-61 27-105 15l-64-35c17 48 49 83 96 101-23 23-57 32-99 22l-65-39c16 51 53 92 106 111-15 21-32 33-56 39 56-3 105 7 155 26 27 11 54 15 89 17l36 18c-35 16-70 23-106 23-51 0-98-10-145-21" />
+            <path className="player-weather-map-outer-banks" d="M783 48c43 31 73 76 84 130 10 48 3 90 16 132 8 25 24 41 42 52-24 9-42 27-57 55-25 45-65 76-120 94" />
+            <path className="player-weather-map-outer-banks player-weather-map-outer-banks-south" d="M748 511c-42-1-80-10-113-25" />
+            <g className="player-weather-map-county-lines">
+              <path d="M171 36l17 95-15 102 38 89-10 104" />
+              <path d="M323 36l-12 105 31 95-24 113 43 101" />
+              <path d="M469 36l17 92-28 89 42 91-34 93" />
+              <path d="M89 160l175-12 177 19" />
+              <path d="M71 278l177 2 168-29" />
+              <path d="M92 398l154-28 174 77" />
             </g>
+            <g className="player-weather-map-waterways">
+              <path d="M72 170c103-21 170-33 242-18 62 13 100 31 174 29 59-2 102 10 154 34" />
+              <path d="M75 291c74-3 121-9 170-9 94 0 145 48 260 62 62 8 101 23 162 53" />
+              <path d="M245 454c47-18 88-33 126-43 52-13 92-34 134-67" />
+              <path d="M296 408c-8 32-2 64 17 96" />
+            </g>
+            <g className="player-weather-map-routes">
+              <path d="M83 319c70-10 118-25 162-37 93-24 170 26 260 62 56 22 91 63 147 98" />
+              <path d="M301 412c46-30 104-53 204-68-22-63-24-111-17-164" />
+              <text x="162" y="309">US 70</text>
+              <text x="419" y="376">US 17</text>
+            </g>
+            <g className="player-weather-map-water-labels">
+              <text x="704" y="163">Albemarle Sound</text>
+              <text x="690" y="286">Pamlico Sound</text>
+              <text x="764" y="472">Atlantic Ocean</text>
+            </g>
+            <g className="player-weather-map-band">
+              <path d="M-80 465C98 405 190 318 315 280S558 187 1000 85" />
+              <path d="M-100 510C105 451 211 366 340 327S619 232 1015 132" />
+            </g>
+            <circle className="player-weather-map-radar-ring" cx="505" cy="344" r="44" />
             <g className="player-weather-map-cities">
-              <circle cx="245" cy="98" r="7" /><text x="261" y="104">Greenville · {mapTemperature("Greenville")}</text>
-              <circle cx="410" cy="118" r="7" /><text x="426" y="124">Washington · {mapTemperature("Washington")}</text>
-              <circle cx="191" cy="216" r="7" /><text x="207" y="222">Kinston · {mapTemperature("Kinston")}</text>
-              <circle className="is-primary" cx="428" cy="235" r="10" /><text className="is-primary" x="448" y="242">New Bern · {mapTemperature("New Bern", temperature ?? "--")}</text>
-              <circle cx="240" cy="337" r="7" /><text x="256" y="343">Jacksonville · {mapTemperature("Jacksonville")}</text>
-              <circle cx="555" cy="344" r="7" /><text x="571" y="350">Morehead City · {mapTemperature("Morehead City")}</text>
+              <g className="player-weather-map-city" transform="translate(292 150)">
+                <circle r="7" /><rect x="15" y="-24" width="154" height="48" rx="12" />
+                <text x="27" y="-3">Greenville</text><text className="temperature" x="27" y="16">{mapTemperature("Greenville")}</text>
+              </g>
+              <g className="player-weather-map-city" transform="translate(488 180)">
+                <circle r="7" /><rect x="15" y="-24" width="162" height="48" rx="12" />
+                <text x="27" y="-3">Washington</text><text className="temperature" x="27" y="16">{mapTemperature("Washington")}</text>
+              </g>
+              <g className="player-weather-map-city" transform="translate(245 282)">
+                <circle r="7" /><rect x="15" y="-24" width="142" height="48" rx="12" />
+                <text x="27" y="-3">Kinston</text><text className="temperature" x="27" y="16">{mapTemperature("Kinston")}</text>
+              </g>
+              <g className="player-weather-map-city is-primary" transform="translate(505 344)">
+                <circle className="is-primary" r="10" /><rect x="18" y="-30" width="184" height="60" rx="14" />
+                <text className="is-primary" x="32" y="-4">New Bern</text><text className="temperature is-primary" x="32" y="21">{mapTemperature("New Bern", temperature ?? "--")}</text>
+              </g>
+              <g className="player-weather-map-city" transform="translate(301 412)">
+                <circle r="7" /><rect x="15" y="-24" width="166" height="48" rx="12" />
+                <text x="27" y="-3">Jacksonville</text><text className="temperature" x="27" y="16">{mapTemperature("Jacksonville")}</text>
+              </g>
+              <g className="player-weather-map-city" transform="translate(652 442)">
+                <circle r="7" /><rect x="15" y="-24" width="183" height="48" rx="12" />
+                <text x="27" y="-3">Morehead City</text><text className="temperature" x="27" y="16">{mapTemperature("Morehead City")}</text>
+              </g>
             </g>
           </svg>
           <div className="player-weather-map-key"><ForecastIcon forecast={currentForecast} /><span>{currentPeriod?.shortForecast ?? "Regional forecast"}</span></div>
