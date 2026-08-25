@@ -3842,6 +3842,8 @@ textarea:focus-visible {
 .creative-builder-assurance strong { color: var(--paper); }
 .creative-builder-submit { width: 100%; }
 .creative-billing-note { margin: -5px 0 0; color: var(--muted); font-size: 9px; line-height: 1.45; text-align: center; }
+.house-ad-schedule-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.house-ad-schedule-grid .field small { margin-top: 6px; color: var(--muted); font-size: 8px; }
 .checkout-consent { display: grid; grid-template-columns: 17px 1fr; align-items: start; gap: 10px; color: var(--muted-bright); font-size: 10px; line-height: 1.5; }
 .checkout-consent input { width: 17px; height: 17px; margin: 0; accent-color: var(--tide); }
 .checkout-consent a { color: var(--tide); text-decoration: underline; text-underline-offset: 2px; }
@@ -3907,6 +3909,15 @@ a.contact-card:hover { border-color: rgba(67, 221, 193, 0.35); background: rgba(
 .campaign-row-action { align-items: center; gap: 11px; flex-wrap: wrap; }
 
 .campaign-review-panel { margin-top: 28px; padding: 24px; }
+.house-ad-studio { margin-top: 28px; padding: 0; overflow: hidden; }
+.house-ad-studio > summary { display: flex; align-items: center; gap: 13px; padding: 22px 24px; cursor: pointer; list-style: none; }
+.house-ad-studio > summary::-webkit-details-marker { display: none; }
+.house-ad-studio > summary::after { margin-left: auto; color: var(--tide); content: "+"; font-size: 23px; font-weight: 300; }
+.house-ad-studio[open] > summary::after { content: "−"; }
+.house-ad-studio > summary > span:last-child { display: grid; gap: 4px; }
+.house-ad-studio > summary strong { color: var(--paper); font-size: 15px; }
+.house-ad-studio > summary small { color: var(--muted); font-size: 10px; }
+.house-ad-studio-body { padding: 28px 24px 24px; border-top: 1px solid var(--line); }
 .control-empty { display: grid; min-height: 220px; place-items: center; align-content: center; gap: 8px; color: var(--tide); text-align: center; }
 .control-empty strong { color: var(--paper); }
 .control-empty span { color: var(--muted); font-size: 11px; }
@@ -3958,6 +3969,7 @@ a.contact-card:hover { border-color: rgba(67, 221, 193, 0.35); background: rgba(
   .creative-preview-panel { position: static; grid-row: 1; }
   .review-creative-grid { grid-template-columns: 1fr; }
   .paid-campaign-table > article { grid-template-columns: 1fr; }
+  .house-ad-schedule-grid { grid-template-columns: 1fr; }
   .advertiser-onboarding,
   .campaign-request-grid {
     grid-template-columns: 1fr;

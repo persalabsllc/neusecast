@@ -97,6 +97,7 @@ export default async function SchedulePage() {
         status: campaigns.status,
         startsAt: campaigns.startsAt,
         endsAt: campaigns.endsAt,
+        targeting: campaigns.targeting,
         billingPaused: campaigns.billingPaused,
         advertiserActive: advertiserAccounts.active,
         subscriptionStatus: advertiserAccounts.subscriptionStatus,
@@ -111,6 +112,7 @@ export default async function SchedulePage() {
         headline: creatives.headline,
         status: creatives.status,
         campaignStatus: campaigns.status,
+        targeting: campaigns.targeting,
         billingPaused: campaigns.billingPaused,
         advertiserActive: advertiserAccounts.active,
         subscriptionStatus: advertiserAccounts.subscriptionStatus,
@@ -163,7 +165,7 @@ export default async function SchedulePage() {
     AIRABLE_CAMPAIGN_STATUSES.has(row.status)
     && (!row.endsAt || row.endsAt.getTime() >= now.getTime())
   ));
-  const paidEligible = scheduledCampaigns.filter(billingEntitled).length;
+  const eligibleCampaigns = scheduledCampaigns.filter(billingEntitled).length;
   const approvedCreative = creativeRows.filter((row) => (
     row.status === "approved"
     && AIRABLE_CAMPAIGN_STATUSES.has(row.campaignStatus)
@@ -201,7 +203,7 @@ export default async function SchedulePage() {
 
       <section className="metric-grid metric-grid-3">
         <article className="metric-card compact-metric-card"><span className="metric-icon metric-icon-teal"><MonitorPlay size={18} /></span><div><p className="metric-label">Active screens</p><p className="metric-value">{activeScreens.length}</p></div><span className="metric-callout">Venue-specific manifests</span></article>
-        <article className="metric-card compact-metric-card"><span className="metric-icon metric-icon-green"><ShieldCheck size={18} /></span><div><p className="metric-label">Air-ready ad creative</p><p className="metric-value">{approvedCreative}</p></div><span className="metric-callout">{paidEligible} billing-active campaigns queued/live</span></article>
+        <article className="metric-card compact-metric-card"><span className="metric-icon metric-icon-green"><ShieldCheck size={18} /></span><div><p className="metric-label">Air-ready ad creative</p><p className="metric-value">{approvedCreative}</p></div><span className="metric-callout">{eligibleCampaigns} paid or house campaigns queued/live</span></article>
         <article className="metric-card compact-metric-card"><span className="metric-icon metric-icon-gold"><CalendarClock size={18} /></span><div><p className="metric-label">Host posts queued/live</p><p className="metric-value">{scheduledHost.length}</p></div><span className="metric-callout">Only on the host’s screen</span></article>
       </section>
 
@@ -220,15 +222,18 @@ export default async function SchedulePage() {
         <div className="panel-heading"><div><p className="eyebrow">Delivery windows</p><h2>Advertiser, host, and filler schedule</h2><p>Campaign and filler times are shown in Eastern Time. Host times use each venue’s timezone.</p></div></div>
         <div className="content-list">
           {scheduledCampaigns.map((campaign) => {
+            const houseAd = campaign.targeting?.houseAd;
             const entitled = billingEntitled(campaign);
-            const billingLabel = entitled
+            const billingLabel = houseAd
+              ? "House ad · billing bypassed"
+              : entitled
               ? "Billing active"
               : !campaign.advertiserActive
                 ? "Account disabled"
                 : campaign.billingPaused
                   ? "Billing hold"
                   : `Billing ${campaign.subscriptionStatus.replaceAll("_", " ")}`;
-            return <article className="content-row" key={campaign.id}><span className="metric-icon metric-icon-gold"><ShieldCheck size={18} /></span><div className="content-main"><div className="content-title-line"><h2>{campaign.business} · {campaign.name}</h2><span className={`status-badge status-${campaign.status}`}>{campaign.status}</span><span className={`status-badge status-${entitled ? "active" : "payment_pending"}`}>{billingLabel}</span></div><p>Network-wide advertiser campaign</p><div className="metadata-row"><span>{formatWindow(campaign.startsAt, campaign.endsAt, CONTROL_TIME_ZONE)}</span></div></div></article>;
+            return <article className="content-row" key={campaign.id}><span className="metric-icon metric-icon-gold"><ShieldCheck size={18} /></span><div className="content-main"><div className="content-title-line"><h2>{houseAd?.sponsor || campaign.business} · {campaign.name}</h2><span className={`status-badge status-${campaign.status}`}>{campaign.status}</span><span className={`status-badge status-${houseAd || entitled ? "active" : "payment_pending"}`}>{billingLabel}</span></div><p>{houseAd ? "Network-wide house advertisement" : "Network-wide advertiser campaign"}</p><div className="metadata-row"><span>{formatWindow(campaign.startsAt, campaign.endsAt, CONTROL_TIME_ZONE)}</span></div></div></article>;
           })}
           {scheduledHost.map((item) => <article className="content-row" key={item.id}><span className="metric-icon metric-icon-teal"><MonitorPlay size={18} /></span><div className="content-main"><div className="content-title-line"><h2>{item.headline}</h2><span className={`status-badge status-${item.status === "approved" ? "active" : item.status}`}>{item.status}</span></div><p>{item.venue}{item.screen ? ` · ${item.screen}` : ""} · venue-only</p><div className="metadata-row"><span>{formatWindow(item.startsAt, item.endsAt, item.timeZone)}</span></div></div></article>)}
           {scheduledFiller.map((item) => <article className="content-row" key={item.id}><span className="metric-icon metric-icon-blue"><Sparkles size={18} /></span><div className="content-main"><div className="content-title-line"><h2>{item.title}</h2><span className="status-badge status-active">Filler enabled</span></div><p>{item.market || "Every market"}</p><div className="metadata-row"><span>{formatWindow(item.startsAt, item.expiresAt, CONTROL_TIME_ZONE)}</span></div></div></article>)}

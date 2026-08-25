@@ -203,7 +203,17 @@ export const campaigns = pgTable(
     endsAt: timestamp("ends_at", { withTimezone: true }),
     durationSeconds: integer("duration_seconds").default(15).notNull(),
     targeting: jsonb("targeting")
-      .$type<{ markets?: string[]; venueTypes?: string[]; notes?: string }>()
+      .$type<{
+        markets?: string[];
+        venueTypes?: string[];
+        notes?: string;
+        houseAd?: {
+          kind: string;
+          sponsor: string;
+          enteredBy: string;
+          bypassBilling: true;
+        };
+      }>()
       .default({}),
     subtotalCents: integer("subtotal_cents").default(0).notNull(),
     totalCents: integer("total_cents").default(0).notNull(),
