@@ -6293,7 +6293,7 @@ a.contact-card:hover { border-color: rgba(67, 221, 193, 0.35); background: rgba(
   display: flex;
   width: max-content;
   min-width: 100%;
-  animation: player-news-ticker 34s linear infinite;
+  animation: player-news-ticker 68s linear infinite;
 }
 
 .player-weather-ticker span {
