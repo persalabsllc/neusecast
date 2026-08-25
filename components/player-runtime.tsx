@@ -547,6 +547,7 @@ export function PlayerRuntime({
     const reportedIndex = initialManifest.items.findIndex((item) => item.id === initialItemId);
     return Math.max(0, reportedIndex);
   });
+  const [playbackGeneration, setPlaybackGeneration] = useState(0);
   const [clock, setClock] = useState("");
   const [accessRevoked, setAccessRevoked] = useState(false);
   const [identity] = useState<DeviceIdentity | null>(() => {
@@ -594,9 +595,12 @@ export function PlayerRuntime({
     return Number.isFinite(expiresAt) && expiresAt > serverNowMs;
   }), [manifest.items, manifest.version, playedAdvertisements, preview, serverNowMs]);
   const playableItemsRef = useRef(playableItems);
-  const playableItemsSignature = playableItems.map((item) => item.id).join("|");
   const displayedIndex = activeIndex < playableItems.length ? activeIndex : 0;
   const currentItem = playableItems[displayedIndex] ?? null;
+  const playbackItemKey = currentItem
+    ? `${currentItem.id}:${currentItem.durationSeconds}:${playbackGeneration}`
+    : `empty:${playbackGeneration}`;
+  const playbackItemRef = useRef(currentItem);
   const isNews = currentItem?.kind === "news";
   const isNewsroom = Boolean(currentItem?.source === "newsroom" && currentItem.newsroomEdition);
   const isWeather = currentItem?.kind === "weather";
@@ -620,6 +624,10 @@ export function PlayerRuntime({
   useEffect(() => {
     playableItemsRef.current = playableItems;
   }, [playableItems]);
+
+  useEffect(() => {
+    playbackItemRef.current = currentItem;
+  }, [currentItem]);
 
   const location = useMemo(
     () => [manifest.venue.city, manifest.venue.state].filter(Boolean).join(", "),
@@ -970,32 +978,36 @@ export function PlayerRuntime({
   }, [accessRevoked, identity, manifest.refreshAfterSeconds, publicFeed, refreshManifest]);
 
   useEffect(() => {
-    if (!currentItem || accessRevoked || manifestExpired) return;
+    if (!playbackItemRef.current || accessRevoked || manifestExpired) return;
 
     const advance = window.setTimeout(() => {
+      const playedItem = playbackItemRef.current;
+      if (!playedItem) return;
+
       if (!preview && !publicFeed) {
-        if (currentItem.kind === "advertisement") {
+        if (playedItem.kind === "advertisement") {
           setPlayedAdvertisements((current) => {
-            const ids = current.manifestVersion === manifest.version
+            const currentManifestVersion = manifestVersion.current;
+            const ids = current.manifestVersion === currentManifestVersion
               ? new Set(current.ids)
               : new Set<string>();
-            ids.add(currentItem.id);
-            return { manifestVersion: manifest.version, ids };
+            ids.add(playedItem.id);
+            return { manifestVersion: currentManifestVersion, ids };
           });
         }
         void sendPlayback({
           eventId: crypto.randomUUID(),
-          itemId: currentItem.id,
-          source: currentItem.source,
-          campaignId: currentItem.campaignId,
-          creativeId: currentItem.creativeId,
-          durationSeconds: currentItem.durationSeconds,
+          itemId: playedItem.id,
+          source: playedItem.source,
+          campaignId: playedItem.campaignId,
+          creativeId: playedItem.creativeId,
+          durationSeconds: playedItem.durationSeconds,
           manifestVersion: manifestVersion.current,
           sessionId: sessionId.current,
           playerVersion,
           playedAt: new Date(Date.now() + clockOffsetRef.current).toISOString(),
         }).then(() => {
-          if (currentItem.kind === "advertisement") void refreshManifest();
+          if (playedItem.kind === "advertisement") void refreshManifest();
         });
       }
       const completedAt = Date.now();
@@ -1003,17 +1015,20 @@ export function PlayerRuntime({
       for (const [itemId, playedAt] of recentEvergreenPlays) {
         if (completedAt - playedAt >= EVERGREEN_REPLAY_GAP_MS) recentEvergreenPlays.delete(itemId);
       }
-      if (isEvergreenFiller(currentItem)) recentEvergreenPlays.set(currentItem.id, completedAt);
-      if (currentItem.source === "newsroom") lastNewsroomPlayRef.current = completedAt;
+      if (isEvergreenFiller(playedItem)) recentEvergreenPlays.set(playedItem.id, completedAt);
+      if (playedItem.source === "newsroom") lastNewsroomPlayRef.current = completedAt;
 
       const currentPlayableItems = playableItemsRef.current;
       if (currentPlayableItems.length === 0) {
         setActiveIndex(0);
+        setPlaybackGeneration((current) => current + 1);
         return;
       }
-      let nextIndex = (displayedIndex + 1) % currentPlayableItems.length;
+      const playedIndex = currentPlayableItems.findIndex((item) => item.id === playedItem.id);
+      const currentIndex = playedIndex >= 0 ? playedIndex : currentPlayableItems.length - 1;
+      let nextIndex = (currentIndex + 1) % currentPlayableItems.length;
       for (let offset = 0; offset < currentPlayableItems.length; offset += 1) {
-        const candidateIndex = (displayedIndex + 1 + offset) % currentPlayableItems.length;
+        const candidateIndex = (currentIndex + 1 + offset) % currentPlayableItems.length;
         const candidate = currentPlayableItems[candidateIndex];
         const lastPlayedAt = recentEvergreenPlays.get(candidate.id);
         const newsroomBlocked = candidate.source === "newsroom"
@@ -1027,12 +1042,15 @@ export function PlayerRuntime({
         }
       }
       setActiveIndex(nextIndex);
-    }, currentItem.durationSeconds * 1000);
+      // A generation change remounts timed children even when a one-item
+      // playlist necessarily selects the same item again.
+      setPlaybackGeneration((current) => current + 1);
+    }, playbackItemRef.current.durationSeconds * 1000);
 
     return () => {
       window.clearTimeout(advance);
     };
-  }, [accessRevoked, currentItem, displayedIndex, manifest.version, manifestExpired, playableItemsSignature, playerVersion, preview, publicFeed, refreshManifest, sendPlayback]);
+  }, [accessRevoked, manifestExpired, playbackItemKey, playerVersion, preview, publicFeed, refreshManifest, sendPlayback]);
 
   if (accessRevoked) {
     return (
@@ -1094,7 +1112,7 @@ export function PlayerRuntime({
         </div>
       </header>
 
-      <section className={`player-slide player-slide-${currentItem.kind}`} key={currentItem.id}>
+      <section className={`player-slide player-slide-${currentItem.kind}`} key={playbackItemKey}>
         {isNewsroom && currentItem.newsroomEdition ? (
           <NewsroomBroadcast
             edition={currentItem.newsroomEdition}
@@ -1170,7 +1188,7 @@ export function PlayerRuntime({
       </footer>
 
       <div className="player-progress" aria-hidden="true">
-        <PlayerProgress key={`${manifest.version}:${displayedIndex}:${currentItem.id}`} durationSeconds={currentItem.durationSeconds} />
+        <PlayerProgress key={playbackItemKey} durationSeconds={currentItem.durationSeconds} />
       </div>
       </main>
     </div>
