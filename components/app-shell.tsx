@@ -9,6 +9,7 @@ import {
   ChevronDown,
   Clapperboard,
   FolderOpen,
+  Handshake,
   LayoutDashboard,
   Menu,
   Megaphone,
@@ -25,6 +26,7 @@ const primaryNavigation = [
   { label: "Content", href: "/control/content", icon: FolderOpen },
   { label: "Newsroom", href: "/control/newsroom", icon: Newspaper },
   { label: "Campaigns", href: "/control/campaigns", icon: Megaphone },
+  { label: "Host Prospects", href: "/control/prospects", icon: Handshake },
   { label: "Schedule", href: "/control/schedule", icon: CalendarClock },
 ] as const;
 
@@ -34,6 +36,7 @@ const pageTitles: Record<string, { eyebrow: string; title: string }> = {
   "/control/content": { eyebrow: "Creative library", title: "Content" },
   "/control/newsroom": { eyebrow: "Hyperlocal programming", title: "Newsroom" },
   "/control/campaigns": { eyebrow: "Sales & delivery", title: "Campaigns" },
+  "/control/prospects": { eyebrow: "Host acquisition", title: "Host Prospects" },
   "/control/schedule": { eyebrow: "Programming", title: "Schedule" },
 };
 

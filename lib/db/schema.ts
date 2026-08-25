@@ -41,6 +41,38 @@ export const hostContentStatus = pgEnum("host_content_status", ["draft", "submit
 export const newsroomStoryStatus = pgEnum("newsroom_story_status", ["review", "approved", "rejected", "killed"]);
 export const newsroomEditionStatus = pgEnum("newsroom_edition_status", ["draft", "review", "published", "withdrawn", "failed"]);
 export const newsroomRiskLevel = pgEnum("newsroom_risk_level", ["low", "sensitive", "critical"]);
+export const hostProspectPriority = pgEnum("host_prospect_priority", ["high", "medium", "low"]);
+export const hostProspectStatus = pgEnum("host_prospect_status", [
+  "researching",
+  "ready",
+  "queued",
+  "contacted",
+  "follow_up",
+  "replied",
+  "meeting",
+  "committed",
+  "converted",
+  "not_interested",
+  "do_not_contact",
+]);
+export const hostProspectActivityType = pgEnum("host_prospect_activity_type", [
+  "research",
+  "note",
+  "email",
+  "status_change",
+  "meeting",
+  "conversion",
+]);
+export const hostProspectDeliveryStatus = pgEnum("host_prospect_delivery_status", [
+  "draft",
+  "queued",
+  "cancelled",
+  "sent",
+  "received",
+  "failed",
+  "bounced",
+  "completed",
+]);
 
 export const appUsers = pgTable(
   "app_users",
@@ -102,6 +134,74 @@ export const venues = pgTable(
   (table) => [
     index("venues_market_idx").on(table.market),
     index("venues_host_idx").on(table.hostClerkUserId),
+  ],
+);
+
+export const hostProspects = pgTable(
+  "host_prospects",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    businessName: varchar("business_name", { length: 200 }).notNull(),
+    venueType: varchar("venue_type", { length: 80 }).notNull(),
+    addressLine1: varchar("address_line_1", { length: 200 }),
+    city: varchar("city", { length: 100 }).default("New Bern").notNull(),
+    state: varchar("state", { length: 2 }).default("NC").notNull(),
+    postalCode: varchar("postal_code", { length: 12 }),
+    market: varchar("market", { length: 100 }).default("New Bern").notNull(),
+    websiteUrl: text("website_url"),
+    contactPageUrl: text("contact_page_url"),
+    researchSourceUrl: text("research_source_url"),
+    contactName: varchar("contact_name", { length: 160 }),
+    contactTitle: varchar("contact_title", { length: 120 }),
+    email: varchar("email", { length: 320 }),
+    phone: varchar("phone", { length: 40 }),
+    emailVerified: boolean("email_verified").default(false).notNull(),
+    fitAngle: text("fit_angle"),
+    priority: hostProspectPriority("priority").default("medium").notNull(),
+    status: hostProspectStatus("status").default("researching").notNull(),
+    lastContactedAt: timestamp("last_contacted_at", { withTimezone: true }),
+    lastRepliedAt: timestamp("last_replied_at", { withTimezone: true }),
+    nextAction: text("next_action"),
+    nextActionAt: timestamp("next_action_at", { withTimezone: true }),
+    optedOutAt: timestamp("opted_out_at", { withTimezone: true }),
+    convertedVenueId: uuid("converted_venue_id").references(() => venues.id, { onDelete: "set null" }),
+    createdByClerkUserId: text("created_by_clerk_user_id").notNull(),
+    notes: text("notes"),
+    ...timestamps,
+  },
+  (table) => [
+    index("host_prospects_status_follow_up_idx").on(table.status, table.nextActionAt),
+    index("host_prospects_market_priority_idx").on(table.market, table.priority),
+    uniqueIndex("host_prospects_email_idx").on(table.email),
+  ],
+);
+
+export const hostProspectActivities = pgTable(
+  "host_prospect_activities",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    prospectId: uuid("prospect_id")
+      .notNull()
+      .references(() => hostProspects.id, { onDelete: "cascade" }),
+    activityType: hostProspectActivityType("activity_type").notNull(),
+    deliveryStatus: hostProspectDeliveryStatus("delivery_status").default("completed").notNull(),
+    direction: varchar("direction", { length: 16 }),
+    channel: varchar("channel", { length: 24 }),
+    subject: varchar("subject", { length: 240 }),
+    body: text("body"),
+    providerMessageId: varchar("provider_message_id", { length: 255 }),
+    providerThreadId: varchar("provider_thread_id", { length: 255 }),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).defaultNow().notNull(),
+    createdByClerkUserId: text("created_by_clerk_user_id").notNull(),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("host_prospect_activities_timeline_idx").on(table.prospectId, table.occurredAt),
+    uniqueIndex("host_prospect_activities_one_queued_email_idx")
+      .on(table.prospectId)
+      .where(sql`${table.activityType} = 'email' and ${table.deliveryStatus} = 'queued'`),
+    uniqueIndex("host_prospect_activities_provider_message_idx").on(table.providerMessageId),
   ],
 );
 

@@ -57,6 +57,13 @@
       "when": 1787628126213,
       "tag": "0007_newsroom",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1787669827221,
+      "tag": "0008_host_prospect_crm",
+      "breakpoints": true
     }
   ]
 }
