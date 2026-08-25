@@ -63,7 +63,7 @@ export async function activateScreen(formData: FormData) {
   const [emailUser] = !selectedHost
     ? await database.select({ clerkUserId: appUsers.clerkUserId, role: appUsers.role, status: appUsers.status }).from(appUsers).where(eq(appUsers.email, hostEmail)).limit(1)
     : [];
-  if (emailUser && (emailUser.role !== "host" || emailUser.status === "suspended")) redirect("/control/screens?error=host");
+  if (emailUser?.status === "suspended") redirect("/control/screens?error=host");
   const hostClerkUserId = selectedHost?.clerkUserId ?? emailUser?.clerkUserId ?? `invited:${hostEmail}`;
   const createHostInvitation = !selectedHost && !emailUser;
   const venueId = randomUUID();
@@ -103,6 +103,12 @@ export async function activateScreen(formData: FormData) {
   if (createHostInvitation) {
     await database.batch([
       database.insert(appUsers).values({ clerkUserId: hostClerkUserId, email: hostEmail, displayName: hostName || venueName, role: "host", status: "invited" }),
+      venueInsert,
+      screenInsert,
+    ] as const);
+  } else if (emailUser && emailUser.role !== "host" && emailUser.role !== "admin") {
+    await database.batch([
+      database.update(appUsers).set({ role: "host", updatedAt: new Date() }).where(eq(appUsers.clerkUserId, emailUser.clerkUserId)),
       venueInsert,
       screenInsert,
     ] as const);
