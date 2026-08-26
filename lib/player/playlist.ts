@@ -18,10 +18,10 @@ import { ensureScreenManagementSchema } from "@/lib/db/ensure-screen-management"
 import { fillerRotationSeed, selectCompleteFillerRotation } from "@/lib/filler/selection";
 import { resolveGeneratedArtwork, safeFillerVisualTemplate } from "@/lib/filler/artwork-policy";
 import type { PlayerItem, PlayerItemKind, PlayerManifest, PlayerTheme } from "./types";
-import { NEUSECAST_HOUSE_AD } from "./house-ad";
 import { broadcastDayWindow } from "@/lib/time-zone";
 import { getRegionalAlerts, getRegionalForecast, regionalWeatherItem } from "./weather";
 import { insertNetworkIdents } from "./idents";
+import { interleaveRotation } from "./interleave";
 import { generatedContentMarketsForScreen } from "./content-markets";
 import {
   insertNewsroomAfterCurrent,
@@ -57,55 +57,6 @@ function activeWindow(startsAt: AnyPgColumn, endsAt: AnyPgColumn, now: Date) {
 function boundedDuration(value: unknown, fallback = 12) {
   const duration = typeof value === "number" ? value : Number(value);
   return Number.isFinite(duration) ? Math.max(3, Math.min(Math.round(duration), 3_600)) : fallback;
-}
-
-function interleaveSupport(hostItems: PlayerItem[], fillerItems: PlayerItem[]) {
-  const support: PlayerItem[] = [];
-  const max = Math.max(hostItems.length, fillerItems.length);
-  for (let index = 0; index < max; index += 1) {
-    if (hostItems[index]) support.push(hostItems[index]);
-    if (fillerItems[index]) support.push(fillerItems[index]);
-  }
-  return support;
-}
-
-export function interleaveRotation(advertisements: PlayerItem[], hostItems: PlayerItem[], fillerItems: PlayerItem[]) {
-  const support = interleaveSupport(hostItems, fillerItems);
-  const advertisementQueue = advertisements.slice(0, Math.max(1, Math.ceil(support.length / 3)));
-  const base: PlayerItem[] = [];
-  let supportIndex = 0;
-  let advertisementIndex = 0;
-
-  while (supportIndex < support.length || advertisementIndex < advertisementQueue.length) {
-    const supportTarget = advertisementIndex < advertisementQueue.length ? 3 : support.length;
-    for (let index = 0; index < supportTarget && supportIndex < support.length; index += 1) {
-      base.push(support[supportIndex]);
-      supportIndex += 1;
-    }
-
-    if (advertisementIndex < advertisementQueue.length) {
-      if (base.at(-1)?.kind === "advertisement") base.push(NEUSECAST_HOUSE_AD);
-      base.push(advertisementQueue[advertisementIndex]);
-      advertisementIndex += 1;
-    }
-  }
-
-  const rotation: PlayerItem[] = [];
-  let contentSinceHouseAd = 0;
-  for (const item of base) {
-    rotation.push(item);
-    if (item.id === NEUSECAST_HOUSE_AD.id) {
-      contentSinceHouseAd = 0;
-    } else {
-      contentSinceHouseAd += 1;
-      if (contentSinceHouseAd >= 6) {
-        rotation.push(NEUSECAST_HOUSE_AD);
-        contentSinceHouseAd = 0;
-      }
-    }
-  }
-  if (rotation.at(-1)?.id !== NEUSECAST_HOUSE_AD.id) rotation.push(NEUSECAST_HOUSE_AD);
-  return rotation;
 }
 
 export async function getPlayerManifest(
