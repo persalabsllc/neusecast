@@ -23,6 +23,12 @@ import {
 } from "lucide-react";
 import type { PlayerItem, PlayerManifest } from "@/lib/player/types";
 import { NewsroomBroadcast } from "@/components/newsroom-broadcast";
+import {
+  nextRotationIndex,
+  playableItemsForRuntime,
+  retainedActiveIndex,
+  shouldRefreshManifestAfterPlayback,
+} from "@/lib/player/runtime-rotation";
 
 const kindLabels: Record<PlayerItem["kind"], string> = {
   advertisement: "Local business",
@@ -35,23 +41,6 @@ const kindLabels: Record<PlayerItem["kind"], string> = {
   community: "Eastern Carolina",
   ident: "NeuseCast Network",
 };
-
-const EVERGREEN_FILLER_CATEGORIES = new Set([
-  "did_you_know",
-  "fact",
-  "history",
-  "on_this_day",
-  "place_spotlight",
-  "then_and_now",
-  "river_and_coast",
-]);
-const EVERGREEN_REPLAY_GAP_MS = 90 * 60 * 1_000;
-const NEWSROOM_REPLAY_GAP_MS = 55 * 60 * 1_000;
-
-function isEvergreenFiller(item: PlayerItem) {
-  return item.source === "generated_content"
-    && EVERGREEN_FILLER_CATEGORIES.has(item.contentCategory ?? "");
-}
 
 function KindIcon({ kind }: { kind: PlayerItem["kind"] }) {
   if (kind === "weather") return <CloudSun />;
@@ -612,6 +601,7 @@ export function PlayerRuntime({
     manifestVersion: initialManifest.version,
     ids: new Set<string>(),
   }));
+  const playedAdvertisementsRef = useRef(playedAdvertisements);
   const clockOffsetRef = useRef(clockOffset(initialManifest.serverTime));
   const manifestFreshnessRef = useRef<ManifestFreshnessAnchor>({
     ageMs: initialManifestAgeMs,
@@ -625,19 +615,13 @@ export function PlayerRuntime({
   const pairingTokenRef = useRef(pairingToken ?? null);
   const flushingPlayback = useRef(false);
   const refreshingManifest = useRef(false);
-  const recentEvergreenPlaysRef = useRef(new Map<string, number>());
   const lastNewsroomPlayRef = useRef(0);
   const stageRef = useRef<HTMLDivElement | null>(null);
-  const playableItems = useMemo(() => manifest.items.filter((item) => {
-    if (
-      !preview
-      && item.kind === "advertisement"
-      && playedAdvertisements.manifestVersion === manifest.version
-      && playedAdvertisements.ids.has(item.id)
-    ) return false;
-    if (!item.expiresAt) return true;
-    const expiresAt = Date.parse(item.expiresAt);
-    return Number.isFinite(expiresAt) && expiresAt > serverNowMs;
+  const playableItems = useMemo(() => playableItemsForRuntime(manifest.items, {
+    manifestVersion: manifest.version,
+    playedAdvertisements,
+    preview,
+    serverNowMs,
   }), [manifest.items, manifest.version, playedAdvertisements, preview, serverNowMs]);
   const playableItemsRef = useRef(playableItems);
   const displayedIndex = activeIndex < playableItems.length ? activeIndex : 0;
@@ -669,6 +653,10 @@ export function PlayerRuntime({
   useEffect(() => {
     playableItemsRef.current = playableItems;
   }, [playableItems]);
+
+  useEffect(() => {
+    playedAdvertisementsRef.current = playedAdvertisements;
+  }, [playedAdvertisements]);
 
   useEffect(() => {
     playbackItemRef.current = currentItem;
@@ -816,16 +804,26 @@ export function PlayerRuntime({
           venue: nextManifest.venue,
         }));
       } else {
-        const retainedIndex = nextManifest.items.findIndex((item) => item.id === currentItemId.current);
+        const nextServerNowMs = Date.parse(nextManifest.serverTime);
+        const nextPlayableItems = playableItemsForRuntime(nextManifest.items, {
+          manifestVersion: nextManifest.version,
+          playedAdvertisements: playedAdvertisementsRef.current,
+          preview,
+          serverNowMs: Number.isFinite(nextServerNowMs) ? nextServerNowMs : Date.now(),
+        });
         setManifest(nextManifest);
-        setActiveIndex(nextManifest.items.length === 0 ? 0 : Math.max(0, retainedIndex));
+        setActiveIndex(retainedActiveIndex(
+          nextPlayableItems,
+          currentItemId.current,
+          playableItemsRef.current,
+        ));
       }
       lastError.current = null;
       return true;
     } finally {
       refreshingManifest.current = false;
     }
-  }, [anchorManifestFreshness, identity, playerKey, publicFeed, revokePlayerAccess, syncServerClock]);
+  }, [anchorManifestFreshness, identity, playerKey, preview, publicFeed, revokePlayerAccess, syncServerClock]);
 
   useEffect(() => {
     if (preview || (!identity && !publicFeed)) return;
@@ -1052,15 +1050,10 @@ export function PlayerRuntime({
           playerVersion,
           playedAt: new Date(Date.now() + clockOffsetRef.current).toISOString(),
         }).then(() => {
-          if (playedItem.kind === "advertisement") void refreshManifest();
+          if (shouldRefreshManifestAfterPlayback(playedItem)) void refreshManifest();
         });
       }
       const completedAt = Date.now();
-      const recentEvergreenPlays = recentEvergreenPlaysRef.current;
-      for (const [itemId, playedAt] of recentEvergreenPlays) {
-        if (completedAt - playedAt >= EVERGREEN_REPLAY_GAP_MS) recentEvergreenPlays.delete(itemId);
-      }
-      if (isEvergreenFiller(playedItem)) recentEvergreenPlays.set(playedItem.id, completedAt);
       if (playedItem.source === "newsroom") lastNewsroomPlayRef.current = completedAt;
 
       const currentPlayableItems = playableItemsRef.current;
@@ -1069,23 +1062,10 @@ export function PlayerRuntime({
         setPlaybackGeneration((current) => current + 1);
         return;
       }
-      const playedIndex = currentPlayableItems.findIndex((item) => item.id === playedItem.id);
-      const currentIndex = playedIndex >= 0 ? playedIndex : currentPlayableItems.length - 1;
-      let nextIndex = (currentIndex + 1) % currentPlayableItems.length;
-      for (let offset = 0; offset < currentPlayableItems.length; offset += 1) {
-        const candidateIndex = (currentIndex + 1 + offset) % currentPlayableItems.length;
-        const candidate = currentPlayableItems[candidateIndex];
-        const lastPlayedAt = recentEvergreenPlays.get(candidate.id);
-        const newsroomBlocked = candidate.source === "newsroom"
-          && completedAt - lastNewsroomPlayRef.current < NEWSROOM_REPLAY_GAP_MS;
-        if (
-          !newsroomBlocked
-          && (!isEvergreenFiller(candidate) || !lastPlayedAt || completedAt - lastPlayedAt >= EVERGREEN_REPLAY_GAP_MS)
-        ) {
-          nextIndex = candidateIndex;
-          break;
-        }
-      }
+      const nextIndex = nextRotationIndex(currentPlayableItems, playedItem.id, {
+        completedAt,
+        lastNewsroomPlayAt: lastNewsroomPlayRef.current,
+      });
       setActiveIndex(nextIndex);
       // A generation change remounts timed children even when a one-item
       // playlist necessarily selects the same item again.

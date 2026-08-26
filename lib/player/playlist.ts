@@ -22,6 +22,7 @@ import { NEUSECAST_HOUSE_AD } from "./house-ad";
 import { broadcastDayWindow } from "@/lib/time-zone";
 import { getRegionalAlerts, getRegionalForecast, regionalWeatherItem } from "./weather";
 import { insertNetworkIdents } from "./idents";
+import { generatedContentMarketsForScreen } from "./content-markets";
 import {
   insertNewsroomAfterCurrent,
   latestPublishedNewsroomEdition,
@@ -221,7 +222,10 @@ export async function getPlayerManifest(
       .where(
         and(
           eq(generatedContent.approved, true),
-          or(isNull(generatedContent.market), eq(generatedContent.market, screen.market)),
+          or(
+            isNull(generatedContent.market),
+            inArray(generatedContent.market, generatedContentMarketsForScreen(screen.market)),
+          ),
           activeWindow(generatedContent.startsAt, generatedContent.expiresAt, now),
         ),
       )
