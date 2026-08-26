@@ -110,25 +110,31 @@ test("only campaign-backed ads request an immediate manifest refresh", () => {
 });
 
 test("played-ad filtering removes paid ads but keeps every scheduled house bumper", () => {
-  const houseAd = item("house", { kind: "advertisement", campaignId: null });
+  const firstHouseAd = neusecastHouseAdPlacement(0);
+  const secondHouseAd = neusecastHouseAdPlacement(1);
   const paidAd = item("paid", { kind: "advertisement", campaignId: "campaign-1" });
   const playable = playableItemsForRuntime([
     item("fact-one"),
-    houseAd,
+    firstHouseAd,
     item("fact-two"),
-    houseAd,
+    secondHouseAd,
     paidAd,
   ], {
     manifestVersion: "current",
     playedAdvertisements: {
       manifestVersion: "current",
-      ids: new Set(["house", "paid"]),
+      ids: new Set([firstHouseAd.id, secondHouseAd.id, "paid"]),
     },
     preview: false,
     serverNowMs: Date.parse("2026-08-26T14:00:00Z"),
   });
 
-  assert.deepEqual(playable.map((entry) => entry.id), ["fact-one", "house", "fact-two", "house"]);
+  assert.deepEqual(playable.map((entry) => entry.id), [
+    "fact-one",
+    firstHouseAd.id,
+    "fact-two",
+    secondHouseAd.id,
+  ]);
 });
 
 test("player reloads only when two concrete deployment versions differ", () => {
