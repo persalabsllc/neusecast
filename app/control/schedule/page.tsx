@@ -15,7 +15,7 @@ import {
   screens,
   venues,
 } from "@/lib/db/schema";
-import { NEUSECAST_HOUSE_AD } from "@/lib/player/house-ad";
+import { isNeusecastHouseAdId, NEUSECAST_HOUSE_AD } from "@/lib/player/house-ad";
 import { deriveScreenHealth, type ScreenHealth } from "@/lib/player/health";
 
 export const dynamic = "force-dynamic";
@@ -206,6 +206,9 @@ export default async function SchedulePage() {
     ...fillerRows.map((row) => [row.id, row.title] as const),
     ...newsroomRows.map((row) => [`newsroom-${row.id}-r${row.revision}`, `${row.label}: ${row.headline}`] as const),
   ]);
+  const contentName = (itemId: string) => (
+    isNeusecastHouseAdId(itemId) ? NEUSECAST_HOUSE_AD.title : contentNames.get(itemId) ?? itemId
+  );
   const snapshotByScreen = new Map(snapshotRows.map((row) => [row.screenId, row]));
 
   return (
@@ -263,7 +266,7 @@ export default async function SchedulePage() {
 
       <section className="panel">
         <div className="panel-heading"><div><p className="eyebrow">Destinations</p><h2>Screen playlists</h2><p>Manifest sync and proof-of-play show what each venue player most recently received and displayed.</p></div></div>
-        {activeScreens.length ? <div className="content-list">{activeScreens.map((screen) => { const snapshot = snapshotByScreen.get(screen.id); const playbackLabel = screen.health === "online" ? "Now playing" : "Last reported"; return <article className="content-row" key={screen.id}><span className="metric-icon metric-icon-teal"><Check size={18} /></span><div className="content-main"><div className="content-title-line"><h2>{screen.venue} · {screen.name}</h2><span className={`status-badge status-${screen.health}`}><span className="status-dot" />{healthLabels[screen.health]}</span></div><p>Playlist synced {formatAge(screen.lastManifestAt, now)} · manifest {shortVersion(screen.lastManifestVersion)}</p><div className="metadata-row"><span>Playback {formatAge(screen.lastPlaybackAt, now)}</span><span>{screen.currentItemId ? `${playbackLabel}: ${contentNames.get(screen.currentItemId) ?? screen.currentItemId}` : "No current item reported"}</span></div>{snapshot ? <div className="metadata-row" aria-label={`Latest ordered playlist for ${screen.venue}`}><span>Latest loop ({snapshot.items.length} items):</span>{snapshot.items.map((item, index) => <span key={`${item.id}-${index}`}>{index + 1}. {contentNames.get(item.id) ?? item.id}</span>)}</div> : <div className="metadata-row"><span>No authenticated manifest snapshot yet</span></div>}</div><Link className="button button-secondary" href={`/control/screens/${screen.id}`}>Inspect <ArrowRight size={15} /></Link></article>; })}</div> : <div className="empty-state"><h3>No screens configured</h3><p>Add a screen to create its venue-specific playlist URL.</p></div>}
+        {activeScreens.length ? <div className="content-list">{activeScreens.map((screen) => { const snapshot = snapshotByScreen.get(screen.id); const playbackLabel = screen.health === "online" ? "Now playing" : "Last reported"; return <article className="content-row" key={screen.id}><span className="metric-icon metric-icon-teal"><Check size={18} /></span><div className="content-main"><div className="content-title-line"><h2>{screen.venue} · {screen.name}</h2><span className={`status-badge status-${screen.health}`}><span className="status-dot" />{healthLabels[screen.health]}</span></div><p>Playlist synced {formatAge(screen.lastManifestAt, now)} · manifest {shortVersion(screen.lastManifestVersion)}</p><div className="metadata-row"><span>Playback {formatAge(screen.lastPlaybackAt, now)}</span><span>{screen.currentItemId ? `${playbackLabel}: ${contentName(screen.currentItemId)}` : "No current item reported"}</span></div>{snapshot ? <div className="metadata-row" aria-label={`Latest ordered playlist for ${screen.venue}`}><span>Latest loop ({snapshot.items.length} items):</span>{snapshot.items.map((item, index) => <span key={`${item.id}-${index}`}>{index + 1}. {contentName(item.id)}</span>)}</div> : <div className="metadata-row"><span>No authenticated manifest snapshot yet</span></div>}</div><Link className="button button-secondary" href={`/control/screens/${screen.id}`}>Inspect <ArrowRight size={15} /></Link></article>; })}</div> : <div className="empty-state"><h3>No screens configured</h3><p>Add a screen to create its venue-specific playlist URL.</p></div>}
       </section>
     </div>
   );

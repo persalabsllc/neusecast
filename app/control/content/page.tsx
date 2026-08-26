@@ -45,7 +45,7 @@ import {
   type FillerCategory,
 } from "@/lib/filler/constants";
 import { selectBalancedFiller } from "@/lib/filler/selection";
-import { NEUSECAST_HOUSE_AD } from "@/lib/player/house-ad";
+import { isNeusecastHouseAdId, NEUSECAST_HOUSE_AD } from "@/lib/player/house-ad";
 import { deriveScreenHealth } from "@/lib/player/health";
 import {
   createFillerContent,
@@ -184,7 +184,7 @@ export default async function ContentPage({ searchParams }: {
     status: screen.status,
     lastHeartbeatAt: screen.lastHeartbeatAt,
   }, now) === "online");
-  const housePromoNowCount = liveScreenRows.filter((screen) => screen.currentItemId === NEUSECAST_HOUSE_AD.id).length;
+  const housePromoNowCount = liveScreenRows.filter((screen) => isNeusecastHouseAdId(screen.currentItemId)).length;
   const fillerWithState = fillerRows.map((item) => ({ ...item, state: fillerState(item, now) }));
   const rotationIdsByScreen = screenRows
     .filter((screen) => screen.active && screen.status !== "retired")
