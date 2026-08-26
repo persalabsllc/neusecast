@@ -78,6 +78,9 @@ export async function POST(
       serverTime: now.toISOString(),
       timeZone: device.timeZone,
       heartbeatAfterSeconds: 30,
+      ...(process.env.VERCEL_GIT_COMMIT_SHA
+        ? { playerVersion: process.env.VERCEL_GIT_COMMIT_SHA.slice(0, 12) }
+        : {}),
     });
     const secure = new URL(request.url).protocol === "https:";
     for (const cookie of playerDeviceCookieHeaders(playerKey, device, secure)) {

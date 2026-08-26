@@ -27,6 +27,7 @@ import {
   nextRotationIndex,
   playableItemsForRuntime,
   retainedActiveIndex,
+  shouldReloadForPlayerVersion,
   shouldRefreshManifestAfterPlayback,
 } from "@/lib/player/runtime-rotation";
 
@@ -352,6 +353,7 @@ type HeartbeatResponse = {
   enrolled?: boolean;
   serverTime?: string;
   timeZone?: string;
+  playerVersion?: string;
 };
 
 type ManifestCacheEnvelope = {
@@ -945,6 +947,10 @@ export function PlayerRuntime({
       }
 
       const result = (await response.json().catch(() => null)) as HeartbeatResponse | null;
+      if (shouldReloadForPlayerVersion(playerVersion, result?.playerVersion)) {
+        window.location.reload();
+        return;
+      }
       if (result?.serverTime) syncServerClock(result.serverTime, result.timeZone);
       const completedPairing = Boolean(pairingTokenRef.current && result?.enrolled);
       if (pairingTokenRef.current) {
@@ -1028,7 +1034,7 @@ export function PlayerRuntime({
       if (!playedItem) return;
 
       if (!preview && !publicFeed) {
-        if (playedItem.kind === "advertisement") {
+        if (playedItem.kind === "advertisement" && playedItem.campaignId !== null) {
           setPlayedAdvertisements((current) => {
             const currentManifestVersion = manifestVersion.current;
             const ids = current.manifestVersion === currentManifestVersion

@@ -5,6 +5,7 @@ import {
   nextRotationIndex,
   playableItemsForRuntime,
   retainedActiveIndex,
+  shouldReloadForPlayerVersion,
   shouldRefreshManifestAfterPlayback,
 } from "./runtime-rotation";
 import {
@@ -78,6 +79,36 @@ test("only campaign-backed ads request an immediate manifest refresh", () => {
   assert.equal(shouldRefreshManifestAfterPlayback(houseAd), false);
   assert.equal(shouldRefreshManifestAfterPlayback(paidAd), true);
   assert.equal(shouldRefreshManifestAfterPlayback(item("fact")), false);
+});
+
+test("played-ad filtering removes paid ads but keeps every scheduled house bumper", () => {
+  const houseAd = item("house", { kind: "advertisement", campaignId: null });
+  const paidAd = item("paid", { kind: "advertisement", campaignId: "campaign-1" });
+  const playable = playableItemsForRuntime([
+    item("fact-one"),
+    houseAd,
+    item("fact-two"),
+    houseAd,
+    paidAd,
+  ], {
+    manifestVersion: "current",
+    playedAdvertisements: {
+      manifestVersion: "current",
+      ids: new Set(["house", "paid"]),
+    },
+    preview: false,
+    serverNowMs: Date.parse("2026-08-26T14:00:00Z"),
+  });
+
+  assert.deepEqual(playable.map((entry) => entry.id), ["fact-one", "house", "fact-two", "house"]);
+});
+
+test("player reloads only when two concrete deployment versions differ", () => {
+  assert.equal(shouldReloadForPlayerVersion("abc123", "def456"), true);
+  assert.equal(shouldReloadForPlayerVersion("abc123", "abc123"), false);
+  assert.equal(shouldReloadForPlayerVersion("abc123", undefined), false);
+  assert.equal(shouldReloadForPlayerVersion("abc123", "neusecast-web"), false);
+  assert.equal(shouldReloadForPlayerVersion("neusecast-web", "def456"), false);
 });
 
 test("manifest refresh retains the current item in the filtered playlist domain", () => {

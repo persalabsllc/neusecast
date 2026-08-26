@@ -20,6 +20,7 @@ export function playableItemsForRuntime(
     if (
       !options.preview
       && item.kind === "advertisement"
+      && item.campaignId !== null
       && options.playedAdvertisements.manifestVersion === options.manifestVersion
       && options.playedAdvertisements.ids.has(item.id)
     ) return false;
@@ -82,4 +83,13 @@ export function nextRotationIndex(
 
 export function shouldRefreshManifestAfterPlayback(item: PlayerItem) {
   return item.kind === "advertisement" && item.campaignId !== null;
+}
+
+export function shouldReloadForPlayerVersion(
+  loadedPlayerVersion: string | null | undefined,
+  currentPlayerVersion: string | null | undefined,
+) {
+  if (!loadedPlayerVersion || loadedPlayerVersion === "neusecast-web") return false;
+  if (!currentPlayerVersion || currentPlayerVersion === "neusecast-web") return false;
+  return loadedPlayerVersion !== currentPlayerVersion;
 }
