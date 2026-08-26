@@ -13,6 +13,7 @@ import {
   generatedContent,
 } from "@/lib/db/schema";
 import { selectBalancedFiller } from "@/lib/filler/selection";
+import { resolveGeneratedArtwork, safeFillerVisualTemplate } from "@/lib/filler/artwork-policy";
 import { interleaveRotation } from "./playlist";
 import { getRegionalAlerts, getRegionalForecast, regionalWeatherItem } from "./weather";
 import { insertNetworkIdents } from "./idents";
@@ -126,9 +127,21 @@ export async function getNetworkChannelManifest(): Promise<PlayerManifest> {
     expiresAt: row.expiresAt?.toISOString() ?? null,
   }));
 
-  const eligibleGeneratedRows = regionalForecast
+  const eligibleGeneratedRows = (regionalForecast
     ? generatedRows.filter((row) => row.category !== "weather")
-    : generatedRows;
+    : generatedRows).map((row) => {
+      const artwork = resolveGeneratedArtwork(row.artworkUrl, row.metadata);
+      return {
+        ...row,
+        artworkUrl: artwork?.url ?? null,
+        artworkCredit: artwork?.credit ?? null,
+        visualTemplate: safeFillerVisualTemplate(
+          row.category,
+          metadataString(row.metadata, "visualTemplate"),
+          Boolean(artwork),
+        ),
+      };
+    });
   const rotationSeed = `network:${Math.floor(now.getTime() / (90 * 60 * 1_000))}`;
   const fillerItems: PlayerItem[] = selectBalancedFiller(eligibleGeneratedRows, undefined, rotationSeed).map((row) => ({
     id: row.id,
@@ -145,8 +158,8 @@ export async function getNetworkChannelManifest(): Promise<PlayerManifest> {
     theme: resolveTheme(row.metadata, "navy"),
     sponsor: row.sourceName,
     contentCategory: row.category,
-    mediaCredit: metadataString(row.metadata, "artworkCredit"),
-    visualTemplate: metadataString(row.metadata, "visualTemplate"),
+    mediaCredit: row.artworkCredit,
+    visualTemplate: row.visualTemplate,
     locationLabel: metadataString(row.metadata, "locationLabel"),
     expiresAt: row.expiresAt?.toISOString() ?? null,
   }));

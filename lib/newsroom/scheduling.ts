@@ -4,6 +4,8 @@ import { and, desc, eq, gt, lte, or } from "drizzle-orm";
 import { getDatabase } from "@/lib/db";
 import { newsroomEditions } from "@/lib/db/schema";
 import type { PlayerItem, PlayerNewsroomEdition } from "@/lib/player/types";
+import { isUnsafeArtworkReference, resolveNewsroomArtwork } from "@/lib/filler/artwork-policy";
+import { effectiveNewsroomExpiry, isNewsroomEditionAirable } from "./windows";
 
 export const NEWSROOM_DEFAULT_GAP_MINUTES = 55;
 
@@ -31,7 +33,7 @@ export async function latestPublishedNewsroomEdition(
       )
     : eq(newsroomEditions.market, market);
 
-  const [edition] = await getDatabase()
+  const candidates = await getDatabase()
     .select()
     .from(newsroomEditions)
     .where(and(
@@ -41,22 +43,35 @@ export async function latestPublishedNewsroomEdition(
       gt(newsroomEditions.expiresAt, now),
     ))
     .orderBy(desc(newsroomEditions.publishedAt), desc(newsroomEditions.updatedAt))
-    .limit(1);
+    .limit(12);
 
-  return edition ?? null;
+  return candidates.find((edition) => isNewsroomEditionAirable(edition, now)) ?? null;
 }
 
 export function newsroomItemFromEdition(
   edition: NonNullable<Awaited<ReturnType<typeof latestPublishedNewsroomEdition>>>,
 ): PlayerItem {
-  const stories = edition.stories ?? [];
+  const effectiveExpiry = effectiveNewsroomExpiry(edition);
+  const stories = (edition.stories ?? []).map((story) => {
+    const artwork = resolveNewsroomArtwork(story.imageUrl, story.imageCredit, story.imageSourceUrl);
+    return {
+      ...story,
+      imageUrl: artwork?.url ?? null,
+      imageCredit: artwork?.credit ?? null,
+      imageSourceUrl: artwork ? story.imageSourceUrl : null,
+      visualTemplate: artwork || story.visualTemplate !== "photo"
+        ? story.visualTemplate
+        : story.locationLabel ? "map" : "headline",
+    };
+  });
+  const posterUrl = isUnsafeArtworkReference(edition.posterUrl) ? null : edition.posterUrl;
   const packageData: PlayerNewsroomEdition = {
     id: edition.id,
     label: edition.label,
     updatedAt: edition.updatedAt.toISOString(),
     ticker: edition.ticker ?? stories.map((story) => story.ticker).join("     •     "),
     videoUrl: edition.videoUrl,
-    posterUrl: edition.posterUrl,
+    posterUrl,
     revision: edition.revision,
     stories,
   };
@@ -72,7 +87,7 @@ export function newsroomItemFromEdition(
     title: edition.headline,
     body: stories[0]?.summary ?? "Your hyperlocal Eastern North Carolina news update.",
     callToAction: "NeuseCast.com",
-    mediaUrl: edition.posterUrl ?? stories.find((story) => story.imageUrl)?.imageUrl ?? null,
+    mediaUrl: posterUrl ?? stories.find((story) => story.imageUrl)?.imageUrl ?? null,
     theme: "blue",
     sponsor: "Captain 97.1 FM News Desk",
     contentCategory: "newsroom_edition",
@@ -80,7 +95,7 @@ export function newsroomItemFromEdition(
     visualTemplate: "broadcast",
     locationLabel: edition.market,
     newsroomEdition: packageData,
-    expiresAt: edition.expiresAt.toISOString(),
+    expiresAt: effectiveExpiry.toISOString(),
   };
 }
 

@@ -14,6 +14,7 @@ import {
   type FillerVisualTemplate,
 } from "./constants";
 import { findEditorialArtwork, type EditorialArtwork } from "./artwork";
+import { safeFillerVisualTemplate, storedAutomaticArtwork } from "./artwork-policy";
 import { localSubjectPrompt } from "./local-subjects";
 
 type GeneratedFillerItem = {
@@ -413,6 +414,12 @@ async function saveMarketBatch(market: string, items: GeneratedFillerItem[]) {
     const itemFingerprint = fingerprint(market, item);
     const matching = existingByFingerprint.get(itemFingerprint);
     if (matching) {
+      const retainedArtwork = item.artwork ?? storedAutomaticArtwork(matching.artworkUrl, matching.metadata);
+      const visualTemplate = safeFillerVisualTemplate(
+        item.category,
+        item.visualTemplate,
+        Boolean(retainedArtwork),
+      );
       const refresh = database
         .update(generatedContent)
         .set({
@@ -421,7 +428,7 @@ async function saveMarketBatch(market: string, items: GeneratedFillerItem[]) {
           body: item.body,
           sourceName: item.sourceName,
           sourceUrl: item.sourceUrl,
-          artworkUrl: item.artwork?.url ?? matching.artworkUrl,
+          artworkUrl: retainedArtwork?.url ?? null,
           startsAt: now,
           expiresAt: expiryFor(item, now),
           approved: true,
@@ -437,10 +444,10 @@ async function saveMarketBatch(market: string, items: GeneratedFillerItem[]) {
             generatedAt: now.toISOString(),
             validUntil: item.validUntil,
             artworkSearchQuery: item.artworkSearchQuery,
-            artworkCredit: item.artwork?.credit ?? matching.metadata?.artworkCredit ?? null,
-            artworkLicense: item.artwork?.license ?? matching.metadata?.artworkLicense ?? null,
-            artworkSourceUrl: item.artwork?.sourceUrl ?? matching.metadata?.artworkSourceUrl ?? null,
-            visualTemplate: item.visualTemplate,
+            artworkCredit: retainedArtwork?.credit ?? null,
+            artworkLicense: retainedArtwork?.license ?? null,
+            artworkSourceUrl: retainedArtwork?.sourceUrl ?? null,
+            visualTemplate,
             locationLabel: item.locationLabel,
           },
           updatedAt: now,
@@ -450,6 +457,11 @@ async function saveMarketBatch(market: string, items: GeneratedFillerItem[]) {
       skipped += 1;
       continue;
     }
+    const visualTemplate = safeFillerVisualTemplate(
+      item.category,
+      item.visualTemplate,
+      Boolean(item.artwork),
+    );
     const insert = database.insert(generatedContent).values({
       category: item.category,
       market,
@@ -475,7 +487,7 @@ async function saveMarketBatch(market: string, items: GeneratedFillerItem[]) {
         artworkCredit: item.artwork?.credit ?? null,
         artworkLicense: item.artwork?.license ?? null,
         artworkSourceUrl: item.artwork?.sourceUrl ?? null,
-        visualTemplate: item.visualTemplate,
+        visualTemplate,
         locationLabel: item.locationLabel,
       },
     });
@@ -492,7 +504,7 @@ async function saveMarketBatch(market: string, items: GeneratedFillerItem[]) {
         artworkCredit: item.artwork?.credit ?? null,
         artworkLicense: item.artwork?.license ?? null,
         artworkSourceUrl: item.artwork?.sourceUrl ?? null,
-        visualTemplate: item.visualTemplate,
+        visualTemplate,
         locationLabel: item.locationLabel,
       },
     });

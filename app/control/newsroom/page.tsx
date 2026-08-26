@@ -12,6 +12,7 @@ import {
 import { getDatabase } from "@/lib/db";
 import { newsroomEditions, newsroomSources, newsroomStories } from "@/lib/db/schema";
 import { NewsroomGenerateControls } from "@/components/newsroom-generate-controls";
+import { isNewsroomEditionAirable } from "@/lib/newsroom/windows";
 import {
   publishNewsroomEditionAction,
   reviewNewsroomStoryAction,
@@ -56,7 +57,10 @@ export default async function NewsroomControlPage() {
     if (story.status === "review") count.review += 1;
     storyCounts.set(story.editionId, count);
   }
-  const published = editions.find((edition) => edition.status === "published");
+  const now = new Date();
+  const published = editions.find((edition) => (
+    edition.status === "published" && isNewsroomEditionAirable(edition, now)
+  ));
   const healthySources = sources.filter((source) => source.active && !source.lastError).length;
 
   return (

@@ -25,6 +25,12 @@ import {
   newsroomSourceForUrl,
   newsroomSourcePrompt,
 } from "./sources";
+import {
+  isNewsroomEditionAirable,
+  newsroomEditionHardExpiry,
+  newsroomRetryCutoff,
+  newsroomSlotWindow,
+} from "./windows";
 
 type GeneratedStory = {
   category: NewsroomCategory;
@@ -445,6 +451,7 @@ async function requestStories(market: string, slot: NewsroomSlot) {
         "For arrests or charges, use alleged/charged/arrested language, state that a charge is not a conviction in the narration, omit home addresses and mugshots, and classify the story sensitive. Exclude minors and sexual-offense details entirely.",
         "Classify actual arrests, charges, active investigations, elections, candidate disputes, allegations, deaths, serious injuries, fires with victims, and named criminal accusations as sensitive or critical. These items require human review and must be written neutrally.",
         "Use low risk for routine government actions, meeting notices, school operations, roads, public weather, business openings, festivals, performances, arts and entertainment, event postponements, and ordinary community information without a real-world safety incident or accusation. Never classify a fictional title, play, book, movie, song, festival name, or quoted work as sensitive merely because its title contains a crime-related word.",
+        "Build a balanced rundown with at least five genuinely low-risk routine civic, school, road, weather, business, arts, event, or community stories whenever the approved sources support them. This is a content-mix target only: never omit a material safety fact or lower a story's correct risk classification to meet it.",
         "Do not place citations, Markdown links, source domains, URLs, or parenthetical source references inside the headline, summary, narration, or ticker. Attribution is displayed separately by the player.",
         "Keep the headline under 12 words. Summary is one or two on-screen sentences. Narration should be 55 to 90 words and understandable without audio because the summary will also be captioned. Ticker is one clean sentence.",
         "Select varied visual templates. Use map for location-driven stories, civic for meetings and votes, numbers for election or budget data, photo for a strong non-sensitive location image, lead for the strongest story, and headline otherwise. Artwork may also support map, civic, numbers, lead, and headline templates.",
@@ -501,21 +508,46 @@ export async function generateNewsroomEdition({
   if (!cleanMarket) return { ...result, error: "A market is required." };
   const database = getDatabase();
   const now = new Date();
-  const dayKey = easternDayKey(now);
-  const recentEditionCutoff = new Date(now.getTime() - 6 * 60 * 60 * 1_000);
+  const automaticWindow = slot === "morning" || slot === "afternoon"
+    ? newsroomSlotWindow(slot, now)
+    : null;
+  const editionDate = automaticWindow?.start ?? now;
+  const dayKey = easternDayKey(editionDate);
+  const retryCutoff = newsroomRetryCutoff(now);
   if (!force) {
-    const [existing] = await database
-      .select({ id: newsroomEditions.id, status: newsroomEditions.status })
+    const existingRows = await database
+      .select({
+        id: newsroomEditions.id,
+        slot: newsroomEditions.slot,
+        status: newsroomEditions.status,
+        scheduledAt: newsroomEditions.scheduledAt,
+        expiresAt: newsroomEditions.expiresAt,
+        createdAt: newsroomEditions.createdAt,
+      })
       .from(newsroomEditions)
       .where(and(
         eq(newsroomEditions.market, cleanMarket),
         eq(newsroomEditions.slot, slot),
-        gte(newsroomEditions.createdAt, recentEditionCutoff),
+        gte(automaticWindow ? newsroomEditions.scheduledAt : newsroomEditions.createdAt, automaticWindow?.start ?? retryCutoff),
       ))
       .orderBy(desc(newsroomEditions.createdAt))
-      .limit(1);
-    if (existing) return { ...result, editionId: existing.id, published: existing.status === "published", skipped: true };
+      .limit(12);
+    const published = existingRows.find((edition) => (
+      edition.status === "published" && isNewsroomEditionAirable(edition, now)
+    ));
+    if (published) return { ...result, editionId: published.id, published: true, skipped: true };
+    const recentAttempt = existingRows.find((edition) => edition.createdAt.getTime() >= retryCutoff.getTime());
+    if (recentAttempt) return { ...result, editionId: recentAttempt.id, published: false, skipped: true };
   }
+
+  const expiresAt = newsroomEditionHardExpiry(slot, now)
+    ?? new Date(now.getTime() + 20 * 60 * 60 * 1_000);
+  const editionMetadata = {
+    editionDay: dayKey,
+    safetyPolicy: "sensitive_review_required",
+    presentation: "native_broadcast_with_video_fallback",
+    generationStartedAt: now.toISOString(),
+  };
 
   try {
     const sourceRows = await ensureNewsroomSources();
@@ -523,25 +555,20 @@ export async function generateNewsroomEdition({
       const host = new URL(source.homepageUrl).hostname.toLowerCase().replace(/^www\./u, "");
       return [host, source] as const;
     }));
-    const stories = await requestStories(cleanMarket, slot);
-    const expiresAt = new Date(now.getTime() + (slot === "morning" ? 18 : 20) * 60 * 60 * 1_000);
     const [edition] = await database.insert(newsroomEditions).values({
       market: cleanMarket,
       slot,
-      label: editionLabel(slot, now),
-      headline: stories[0]?.headline ?? "Your Eastern North Carolina update",
+      label: editionLabel(slot, editionDate),
+      headline: "Your Eastern North Carolina update",
       status: "draft",
       scheduledAt: now,
       expiresAt,
       durationSeconds: 180,
       stories: [],
-      metadata: {
-        editionDay: dayKey,
-        safetyPolicy: "sensitive_review_required",
-        presentation: "native_broadcast_with_video_fallback",
-      },
+      metadata: editionMetadata,
     }).returning();
     result.editionId = edition.id;
+    const stories = await requestStories(cleanMarket, slot);
     const storyRows = stories.map((story) => {
       const sourceHost = new URL(story.sourceUrl).hostname.toLowerCase().replace(/^www\./u, "");
       const source = [...sourceByHost.entries()].find(([host]) => sourceHost === host || sourceHost.endsWith(`.${host}`))?.[1];
@@ -584,11 +611,35 @@ export async function generateNewsroomEdition({
     result.published = rebuilt?.status === "published";
     const usedSourceIds = storyRows.flatMap((story) => story.sourceId ? [story.sourceId] : []);
     if (usedSourceIds.length) {
-      await database.update(newsroomSources).set({ lastCheckedAt: now, lastSuccessAt: now, lastError: null, updatedAt: now }).where(inArray(newsroomSources.id, usedSourceIds));
+      try {
+        await database.update(newsroomSources).set({ lastCheckedAt: now, lastSuccessAt: now, lastError: null, updatedAt: now }).where(inArray(newsroomSources.id, usedSourceIds));
+      } catch (sourceStatusError) {
+        console.warn("[newsroom:generation] edition completed but source health could not be updated", {
+          editionId: edition.id,
+          error: sourceStatusError instanceof Error ? sourceStatusError.message : String(sourceStatusError),
+        });
+      }
     }
     return result;
   } catch (error) {
     result.error = error instanceof Error ? error.message : "Newsroom generation failed.";
+    if (result.editionId) {
+      try {
+        await database
+          .update(newsroomEditions)
+          .set({
+            status: "failed",
+            metadata: { ...editionMetadata, generationError: result.error },
+            updatedAt: new Date(),
+          })
+          .where(eq(newsroomEditions.id, result.editionId));
+      } catch (statusError) {
+        console.error("[newsroom:generation] could not persist failed status", {
+          editionId: result.editionId,
+          error: statusError instanceof Error ? statusError.message : String(statusError),
+        });
+      }
+    }
     return result;
   }
 }

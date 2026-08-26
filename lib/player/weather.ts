@@ -3,6 +3,12 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { unstable_cache } from "next/cache";
 import type { PlayerAlert, PlayerItem, PlayerWeatherLocation, PlayerWeatherPeriod } from "./types";
+import {
+  createLastKnownAlertStore,
+  filterUnexpiredAlerts,
+  NwsHttpError,
+  retryTransientNwsRequest,
+} from "./weather-resilience";
 
 const REGIONAL_POINT = {
   latitude: 35.1085,
@@ -84,13 +90,15 @@ function boundedText(value: unknown, max: number) {
 }
 
 async function nwsJson<T>(url: string): Promise<T> {
-  const response = await fetch(url, {
-    headers: NWS_HEADERS,
-    cache: "no-store",
-    signal: AbortSignal.timeout(7_000),
+  return retryTransientNwsRequest(async () => {
+    const response = await fetch(url, {
+      headers: NWS_HEADERS,
+      cache: "no-store",
+      signal: AbortSignal.timeout(7_000),
+    });
+    if (!response.ok) throw new NwsHttpError(response.status);
+    return response.json() as Promise<T>;
   });
-  if (!response.ok) throw new Error(`NWS request failed with ${response.status}.`);
-  return response.json() as Promise<T>;
 }
 
 function fahrenheit(value: number, unitCode: string) {
@@ -200,11 +208,26 @@ export const getRegionalForecast = unstable_cache(
   { revalidate: 300 },
 );
 
-export const getRegionalAlerts = unstable_cache(
+const getCachedRegionalAlerts = unstable_cache(
   requestRegionalAlerts,
   ["neusecast", "nws", "regional-alerts", "new-bern"],
   { revalidate: 60 },
 );
+
+const lastKnownRegionalAlerts = createLastKnownAlertStore();
+
+export async function getRegionalAlerts(): Promise<PlayerAlert[]> {
+  try {
+    const alerts = await getCachedRegionalAlerts();
+    lastKnownRegionalAlerts.remember(alerts);
+    return filterUnexpiredAlerts(alerts);
+  } catch (error) {
+    const fallback = lastKnownRegionalAlerts.current();
+    if (fallback === null) throw error;
+    console.warn("NeuseCast is retaining the last-known NWS warning state after a refresh failure", error);
+    return fallback;
+  }
+}
 
 export function regionalWeatherItem(forecast: RegionalForecast): PlayerItem {
   const current = forecast.periods[0];
