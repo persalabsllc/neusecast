@@ -183,22 +183,37 @@ async function requestRegionalAlerts(): Promise<PlayerAlert[]> {
   const alerts = await nwsJson<NwsAlertsResponse>(
     `https://api.weather.gov/alerts/active?point=${REGIONAL_POINT.latitude},${REGIONAL_POINT.longitude}&status=actual`,
   );
+  const now = Date.now();
   return (alerts.features ?? []).flatMap((feature) => {
     const event = boundedText(feature.properties?.event, 90);
     const severity = boundedText(feature.properties?.severity, 30);
     if (!/warning/iu.test(event) || !["Extreme", "Severe"].includes(severity)) return [];
     const headline = boundedText(feature.properties?.headline, 300) || event;
     const area = boundedText(feature.properties?.areaDesc, 180) || REGIONAL_POINT.label;
+    const expiresAt = boundedText(feature.properties?.ends, 40)
+      || boundedText(feature.properties?.expires, 40);
+    const expiresAtMs = Date.parse(expiresAt);
+    if (!Number.isFinite(expiresAtMs) || expiresAtMs <= now) return [];
     return [{
       id: boundedText(feature.id, 300) || createHash("sha256").update(`${event}|${headline}`).digest("hex"),
       event,
       headline,
       area,
       severity,
-      expiresAt: boundedText(feature.properties?.ends, 40)
-        || boundedText(feature.properties?.expires, 40)
-        || null,
+      expiresAt,
     }];
+  }).sort((left, right) => {
+    const severity = Number(right.severity === "Extreme") - Number(left.severity === "Extreme");
+    if (severity) return severity;
+    const eventRank = (event: string) => {
+      if (/tornado|hurricane|storm surge|flash flood/iu.test(event)) return 0;
+      if (/severe thunderstorm/iu.test(event)) return 1;
+      return 2;
+    };
+    const event = eventRank(left.event) - eventRank(right.event);
+    if (event) return event;
+    return Date.parse(left.expiresAt ?? "") - Date.parse(right.expiresAt ?? "")
+      || left.id.localeCompare(right.id);
   }).slice(0, 4);
 }
 

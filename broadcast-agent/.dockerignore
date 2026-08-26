@@ -1,0 +1,6 @@
+.env
+test
+docs
+README.md
+node_modules
+npm-debug.log

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <paths>
+    <media-path>/var/lib/casparcg/media/</media-path>
+    <log-path disabled="true">/var/lib/casparcg/log/</log-path>
+    <data-path>/var/lib/casparcg/data/</data-path>
+    <template-path>/var/lib/casparcg/template/</template-path>
+  </paths>
+  <log-level>info</log-level>
+  <log-align-columns>true</log-align-columns>
+  <html>
+    <remote-debugging-port>0</remote-debugging-port>
+    <enable-gpu>false</enable-gpu>
+    <cache-path>/var/lib/casparcg/cache/</cache-path>
+  </html>
+  <channels>
+    <channel>
+      <video-mode>1080p3000</video-mode>
+      <color-depth>8</color-depth>
+      <color-space>bt709</color-space>
+      <consumers>
+$CASPAR_CONSUMER_XML
+      </consumers>
+    </channel>
+  </channels>
+  <controllers>
+    <tcp>
+      <port>5250</port>
+      <protocol>AMCP</protocol>
+    </tcp>
+  </controllers>
+  <osc>
+    <disable-send-to-amcp-clients>true</disable-send-to-amcp-clients>
+  </osc>
+</configuration>

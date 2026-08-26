@@ -1,0 +1,175 @@
+.player {
+  position: relative;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  overflow: hidden;
+  place-items: center;
+  background:
+    radial-gradient(circle at 50% 38%, rgba(67, 221, 193, 0.13), transparent 34%),
+    linear-gradient(145deg, #06171c, #02090c 68%);
+  isolation: isolate;
+}
+
+.video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: #02090c;
+  object-fit: contain;
+}
+
+.liveBadge {
+  position: absolute;
+  top: clamp(12px, 2vw, 24px);
+  left: clamp(12px, 2vw, 24px);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  background: rgba(4, 13, 16, 0.76);
+  font-size: clamp(9px, 0.85vw, 12px);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  backdrop-filter: blur(10px);
+  transition: opacity 160ms ease;
+  pointer-events: none;
+}
+
+.liveBadge[aria-hidden="true"] {
+  opacity: 0;
+}
+
+.liveBadge span {
+  width: 7px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #ff695f;
+  box-shadow: 0 0 0 4px rgba(255, 105, 95, 0.14);
+  animation: livePulse 1.8s ease-in-out infinite;
+}
+
+.overlay {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  max-width: min(86%, 420px);
+  flex-direction: column;
+  align-items: center;
+  padding: clamp(18px, 4vw, 40px);
+  color: #f5f7f2;
+  text-align: center;
+}
+
+.statusIcon {
+  display: grid;
+  width: clamp(42px, 6vw, 68px);
+  aspect-ratio: 1;
+  margin-bottom: clamp(12px, 2vw, 22px);
+  place-items: center;
+  color: #43ddc1;
+  border: 1px solid rgba(67, 221, 193, 0.3);
+  border-radius: 50%;
+  background: rgba(67, 221, 193, 0.08);
+}
+
+.statusIcon svg {
+  width: 42%;
+  height: 42%;
+}
+
+.player[data-state="offline"] .statusIcon {
+  color: #ff8b83;
+  border-color: rgba(255, 105, 95, 0.3);
+  background: rgba(255, 105, 95, 0.08);
+}
+
+.overlay strong {
+  font-size: clamp(17px, 2vw, 28px);
+  letter-spacing: -0.025em;
+}
+
+.overlay p {
+  margin: 8px 0 0;
+  color: #9db2b3;
+  font-size: clamp(11px, 1.1vw, 15px);
+  line-height: 1.5;
+}
+
+.loader {
+  width: 22px;
+  aspect-ratio: 1;
+  margin-top: clamp(14px, 2vw, 24px);
+  border: 2px solid rgba(67, 221, 193, 0.18);
+  border-top-color: #43ddc1;
+  border-radius: 50%;
+  animation: spin 800ms linear infinite;
+}
+
+.retryButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  margin-top: clamp(16px, 2.4vw, 28px);
+  padding: 10px 17px;
+  color: #061419;
+  border: 0;
+  border-radius: 999px;
+  background: #43ddc1;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.retryButton:hover {
+  background: #65e7d0;
+}
+
+.retryButton:focus-visible {
+  outline: 3px solid #f5f7f2;
+  outline-offset: 3px;
+}
+
+.retryButton svg {
+  width: 15px;
+  height: 15px;
+}
+
+.screenReaderStatus {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes livePulse {
+  50% {
+    opacity: 0.55;
+    box-shadow: 0 0 0 7px rgba(255, 105, 95, 0.05);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .liveBadge,
+  .liveBadge span,
+  .loader {
+    animation: none;
+    transition: none;
+  }
+}

@@ -1,0 +1,8 @@
+# Merge this file only on an Intel/AMD Linux playout host with /dev/dri.
+# Set RENDER_GROUP_ID to: stat -c '%g' /dev/dri/renderD128
+services:
+  casparcg:
+    devices:
+      - /dev/dri:/dev/dri
+    group_add:
+      - "${RENDER_GROUP_ID}"

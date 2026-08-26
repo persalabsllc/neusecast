@@ -78,6 +78,13 @@
       "when": 1787751150000,
       "tag": "0010_retire_legacy_document_artwork",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1787779322804,
+      "tag": "0011_broadcast_control",
+      "breakpoints": true
     }
   ]
 }
