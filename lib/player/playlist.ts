@@ -15,7 +15,7 @@ import {
   venues,
 } from "@/lib/db/schema";
 import { ensureScreenManagementSchema } from "@/lib/db/ensure-screen-management";
-import { selectBalancedFiller } from "@/lib/filler/selection";
+import { fillerRotationSeed, selectCompleteFillerRotation } from "@/lib/filler/selection";
 import { resolveGeneratedArtwork, safeFillerVisualTemplate } from "@/lib/filler/artwork-policy";
 import type { PlayerItem, PlayerItemKind, PlayerManifest, PlayerTheme } from "./types";
 import { NEUSECAST_HOUSE_AD } from "./house-ad";
@@ -151,7 +151,7 @@ export async function getPlayerManifest(
   const broadcastDay = broadcastDayWindow(now, screen.timeZone);
 
   const newsroomGapMinutes = newsroomMinimumGapMinutes();
-  const [creativeRows, hostRows, generatedRows, blockedRows, playbackRows, recentFillerPlaybackRows, regionalForecast, regionalAlerts, newsroomEdition] = await Promise.all([
+  const [creativeRows, hostRows, generatedRows, blockedRows, playbackRows, recentPlaybackRows, regionalForecast, regionalAlerts, newsroomEdition] = await Promise.all([
     database
       .selectDistinct({
         id: creatives.id,
@@ -217,6 +217,7 @@ export async function getPlayerManifest(
         artworkUrl: generatedContent.artworkUrl,
         metadata: generatedContent.metadata,
         expiresAt: generatedContent.expiresAt,
+        updatedAt: generatedContent.updatedAt,
       })
       .from(generatedContent)
       .where(
@@ -253,7 +254,7 @@ export async function getPlayerManifest(
       .from(playbackEvents)
       .where(and(
         eq(playbackEvents.screenId, screen.id),
-        gte(playbackEvents.playedAt, new Date(now.getTime() - Math.max(90, newsroomGapMinutes) * 60 * 1_000)),
+        gte(playbackEvents.playedAt, new Date(now.getTime() - newsroomGapMinutes * 60 * 1_000)),
         lte(playbackEvents.playedAt, now),
       )),
     regionalForecastPromise,
@@ -334,17 +335,8 @@ export async function getPlayerManifest(
         ),
       };
     });
-  const recentlyPlayedFillerIds = new Set(recentFillerPlaybackRows.flatMap((row) => (
-    row.metadata?.source === "generated_content" && typeof row.metadata.itemId === "string"
-      ? [row.metadata.itemId]
-      : []
-  )));
-  const notRecentlyPlayedRows = eligibleGeneratedRows.filter((row) => !recentlyPlayedFillerIds.has(row.id));
-  const rotationRows = notRecentlyPlayedRows.length >= Math.min(6, eligibleGeneratedRows.length)
-    ? notRecentlyPlayedRows
-    : eligibleGeneratedRows;
-  const rotationSeed = `${screen.id}:${Math.floor(now.getTime() / (90 * 60 * 1_000))}`;
-  const fillerItems: PlayerItem[] = selectBalancedFiller(rotationRows, undefined, rotationSeed).map((row) => ({
+  const rotationSeed = fillerRotationSeed(`screen:${screen.id}`, now.getTime());
+  const fillerItems: PlayerItem[] = selectCompleteFillerRotation(eligibleGeneratedRows, rotationSeed).map((row) => ({
     id: row.id,
     kind: resolveKind(row.category),
     source: "generated_content",
@@ -370,7 +362,7 @@ export async function getPlayerManifest(
     interleaveRotation(advertisements, hostItems, fillerItems),
     `screen:${screen.id}`,
   );
-  const newsroomPlayedRecently = recentFillerPlaybackRows.some((row) => (
+  const newsroomPlayedRecently = recentPlaybackRows.some((row) => (
     row.metadata?.source === "newsroom"
     && typeof row.metadata.receivedAt === "string"
     && now.getTime() - Date.parse(row.metadata.receivedAt) < newsroomGapMinutes * 60 * 1_000

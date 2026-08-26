@@ -12,7 +12,7 @@ import {
   creatives,
   generatedContent,
 } from "@/lib/db/schema";
-import { selectBalancedFiller } from "@/lib/filler/selection";
+import { fillerRotationSeed, selectCompleteFillerRotation } from "@/lib/filler/selection";
 import { resolveGeneratedArtwork, safeFillerVisualTemplate } from "@/lib/filler/artwork-policy";
 import { interleaveRotation } from "./playlist";
 import { getRegionalAlerts, getRegionalForecast, regionalWeatherItem } from "./weather";
@@ -89,6 +89,7 @@ export async function getNetworkChannelManifest(): Promise<PlayerManifest> {
         artworkUrl: generatedContent.artworkUrl,
         metadata: generatedContent.metadata,
         expiresAt: generatedContent.expiresAt,
+        updatedAt: generatedContent.updatedAt,
       })
       .from(generatedContent)
       .where(and(
@@ -142,8 +143,8 @@ export async function getNetworkChannelManifest(): Promise<PlayerManifest> {
         ),
       };
     });
-  const rotationSeed = `network:${Math.floor(now.getTime() / (90 * 60 * 1_000))}`;
-  const fillerItems: PlayerItem[] = selectBalancedFiller(eligibleGeneratedRows, undefined, rotationSeed).map((row) => ({
+  const rotationSeed = fillerRotationSeed("network", now.getTime());
+  const fillerItems: PlayerItem[] = selectCompleteFillerRotation(eligibleGeneratedRows, rotationSeed).map((row) => ({
     id: row.id,
     kind: resolveKind(row.category),
     source: "generated_content",
