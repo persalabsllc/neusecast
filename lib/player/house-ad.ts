@@ -1,5 +1,5 @@
 import type { PlayerItem } from "./types";
-import { HOUSE_AD_ID } from "@/lib/filler/constants";
+import { HOUSE_AD_ID } from "../filler/constants";
 
 export const NEUSECAST_HOUSE_AD: PlayerItem = {
   id: HOUSE_AD_ID,
@@ -16,3 +16,16 @@ export const NEUSECAST_HOUSE_AD: PlayerItem = {
   theme: "coral",
   sponsor: "NeuseCast",
 };
+
+const HOUSE_AD_PLACEMENT_SEPARATOR = "-placement-";
+
+export function neusecastHouseAdPlacement(placementIndex: number): PlayerItem {
+  return {
+    ...NEUSECAST_HOUSE_AD,
+    id: `${HOUSE_AD_ID}${HOUSE_AD_PLACEMENT_SEPARATOR}${placementIndex + 1}`,
+  };
+}
+
+export function isNeusecastHouseAdId(itemId: string | null | undefined) {
+  return itemId === HOUSE_AD_ID || itemId?.startsWith(`${HOUSE_AD_ID}${HOUSE_AD_PLACEMENT_SEPARATOR}`) === true;
+}
