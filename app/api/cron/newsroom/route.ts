@@ -1,37 +1,56 @@
 import { generateNewsroomForActiveMarkets } from "@/lib/newsroom/generator";
-import type { NewsroomSlot } from "@/lib/newsroom/types";
+import { newsroomCronOutcome } from "@/lib/newsroom/cron-status";
+import { automaticNewsroomSlot } from "@/lib/newsroom/windows";
 
 export const maxDuration = 300;
-
-function easternHour(now: Date) {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York",
-    hour: "numeric",
-    hourCycle: "h23",
-  }).formatToParts(now);
-  return Number(parts.find((part) => part.type === "hour")?.value);
-}
 
 export async function GET(request: Request) {
   if (!process.env.CRON_SECRET || request.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
   const startedAt = new Date();
-  const hour = easternHour(startedAt);
-  const slot: NewsroomSlot | null = hour === 6 ? "morning" : hour === 15 ? "afternoon" : null;
-  if (!slot) {
-    return Response.json({ ok: true, skipped: true, reason: "Outside the 6 a.m. and 3 p.m. Eastern newsroom windows." });
+  const slot = automaticNewsroomSlot(startedAt);
+
+  try {
+    const results = await generateNewsroomForActiveMarkets(slot);
+    const outcome = newsroomCronOutcome(results);
+    const completedAt = new Date();
+    if (!outcome.ok) {
+      console.error("[newsroom:cron] one or more markets have no published edition", {
+        slot,
+        startedAt: startedAt.toISOString(),
+        completedAt: completedAt.toISOString(),
+        failures: outcome.failures,
+      });
+    }
+
+    return Response.json({
+      ok: outcome.ok,
+      slot,
+      startedAt: startedAt.toISOString(),
+      completedAt: completedAt.toISOString(),
+      generated: results.filter((result) => result.editionId && !result.skipped).length,
+      published: results.filter((result) => result.published).length,
+      skipped: results.filter((result) => result.skipped).length,
+      failures: outcome.failures,
+      results,
+    }, {
+      status: outcome.status,
+      headers: { "Cache-Control": "no-store" },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Newsroom cron failed.";
+    console.error("[newsroom:cron] generation failed before market results were available", {
+      slot,
+      startedAt: startedAt.toISOString(),
+      error: message,
+    });
+    return Response.json({
+      ok: false,
+      slot,
+      startedAt: startedAt.toISOString(),
+      completedAt: new Date().toISOString(),
+      error: message,
+    }, { status: 502, headers: { "Cache-Control": "no-store" } });
   }
-  const results = await generateNewsroomForActiveMarkets(slot);
-  const failures = results.filter((result) => result.error);
-  return Response.json({
-    ok: failures.length === 0,
-    slot,
-    startedAt: startedAt.toISOString(),
-    completedAt: new Date().toISOString(),
-    generated: results.filter((result) => result.editionId && !result.skipped).length,
-    skipped: results.filter((result) => result.skipped).length,
-    failures,
-    results,
-  }, { status: failures.length ? 207 : 200 });
 }

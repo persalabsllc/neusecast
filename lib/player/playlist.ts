@@ -16,6 +16,7 @@ import {
 } from "@/lib/db/schema";
 import { ensureScreenManagementSchema } from "@/lib/db/ensure-screen-management";
 import { selectBalancedFiller } from "@/lib/filler/selection";
+import { resolveGeneratedArtwork, safeFillerVisualTemplate } from "@/lib/filler/artwork-policy";
 import type { PlayerItem, PlayerItemKind, PlayerManifest, PlayerTheme } from "./types";
 import { NEUSECAST_HOUSE_AD } from "./house-ad";
 import { broadcastDayWindow } from "@/lib/time-zone";
@@ -314,9 +315,21 @@ export async function getPlayerManifest(
     expiresAt: row.expiresAt?.toISOString() ?? null,
   }));
 
-  const eligibleGeneratedRows = regionalForecast
+  const eligibleGeneratedRows = (regionalForecast
     ? generatedRows.filter((row) => row.category !== "weather")
-    : generatedRows;
+    : generatedRows).map((row) => {
+      const artwork = resolveGeneratedArtwork(row.artworkUrl, row.metadata);
+      return {
+        ...row,
+        artworkUrl: artwork?.url ?? null,
+        artworkCredit: artwork?.credit ?? null,
+        visualTemplate: safeFillerVisualTemplate(
+          row.category,
+          metadataString(row.metadata, "visualTemplate"),
+          Boolean(artwork),
+        ),
+      };
+    });
   const recentlyPlayedFillerIds = new Set(recentFillerPlaybackRows.flatMap((row) => (
     row.metadata?.source === "generated_content" && typeof row.metadata.itemId === "string"
       ? [row.metadata.itemId]
@@ -342,8 +355,8 @@ export async function getPlayerManifest(
     theme: resolveTheme(row.metadata, "navy"),
     sponsor: row.sourceName,
     contentCategory: row.category,
-    mediaCredit: metadataString(row.metadata, "artworkCredit"),
-    visualTemplate: metadataString(row.metadata, "visualTemplate"),
+    mediaCredit: row.artworkCredit,
+    visualTemplate: row.visualTemplate,
     locationLabel: metadataString(row.metadata, "locationLabel"),
     expiresAt: row.expiresAt?.toISOString() ?? null,
   }));

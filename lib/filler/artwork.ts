@@ -1,11 +1,12 @@
 import "server-only";
 
-export type EditorialArtwork = {
-  url: string;
-  credit: string;
-  license: string;
-  sourceUrl: string;
-};
+import {
+  isCommerciallyReusableLicense,
+  isUnsafeArtworkReference,
+  type EditorialArtwork,
+} from "./artwork-policy";
+
+export type { EditorialArtwork } from "./artwork-policy";
 
 type CommonsMetadataValue = { value?: string };
 
@@ -16,6 +17,7 @@ type CommonsResponse = {
       imageinfo?: Array<{
         width?: number;
         height?: number;
+        mime?: string;
         thumburl?: string;
         url?: string;
         descriptionurl?: string;
@@ -32,8 +34,6 @@ type CommonsResponse = {
 };
 
 const MAX_ARTWORK_QUERIES = 2;
-const DOCUMENT_SCAN_PATTERN = /\b(?:census|city directory|environmental statement|meeting minutes|proceedings|registered motor vehicle|report to the public|statutes at large)\b|\bpage\s+\d+\b|\.(?:djvu|pdf|tiff?)(?:\b|$)/iu;
-
 function cleanText(value: unknown, max: number) {
   if (typeof value !== "string") return "";
   return value
@@ -44,11 +44,6 @@ function cleanText(value: unknown, max: number) {
     .replace(/\s+/gu, " ")
     .trim()
     .slice(0, max);
-}
-
-function isCommerciallyReusableLicense(value: string) {
-  return /^(?:public domain|cc0|cc by(?:-sa)?(?:\s|$))/iu.test(value)
-    && !/(?:-nc|-nd)/iu.test(value);
 }
 
 function artworkQueries(searchQuery: string, fallbackQueries: readonly string[]) {
@@ -73,7 +68,7 @@ async function searchCommonsArtwork(query: string): Promise<EditorialArtwork | n
     gsrnamespace: "6",
     gsrlimit: "24",
     prop: "imageinfo",
-    iiprop: "url|size|extmetadata",
+    iiprop: "url|size|mime|extmetadata",
     iiurlwidth: "1600",
   }).toString();
 
@@ -92,7 +87,7 @@ async function searchCommonsArtwork(query: string): Promise<EditorialArtwork | n
       const termScore = [...queryTerms].filter((term) => title.includes(term)).length * 10;
       const landscapeScore = (info?.width ?? 0) >= (info?.height ?? Number.POSITIVE_INFINITY) ? 4 : 0;
       const resolutionScore = (info?.width ?? 0) >= 1_200 ? 2 : 0;
-      const documentPenalty = DOCUMENT_SCAN_PATTERN.test(page.title ?? "") ? 100 : 0;
+      const documentPenalty = isUnsafeArtworkReference(page.title) ? 100 : 0;
       return termScore + landscapeScore + resolutionScore - documentPenalty;
     };
     return score(right) - score(left);
@@ -105,15 +100,18 @@ async function searchCommonsArtwork(query: string): Promise<EditorialArtwork | n
     if (
       !url.startsWith("https://")
       || !sourceUrl.startsWith("https://")
+      || !["image/jpeg", "image/png", "image/webp"].includes(info?.mime ?? "")
       || !isCommerciallyReusableLicense(license)
-      || DOCUMENT_SCAN_PATTERN.test(page.title ?? "")
-      || /\.(?:svg|gif|pdf|djvu|tiff?)(?:\?|$)/iu.test(url)
+      || isUnsafeArtworkReference(page.title)
+      || isUnsafeArtworkReference(url)
+      || isUnsafeArtworkReference(sourceUrl)
+      || /\.(?:svg|gif)(?:\?|$)/iu.test(url)
       || (info?.width ?? 0) < 900
       || (info?.height ?? 0) < 500
     ) continue;
     try {
       if (new URL(url).hostname !== "upload.wikimedia.org") continue;
-      if (!new URL(sourceUrl).hostname.endsWith("commons.wikimedia.org")) continue;
+      if (new URL(sourceUrl).hostname !== "commons.wikimedia.org") continue;
     } catch {
       continue;
     }
