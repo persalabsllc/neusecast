@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "test:artwork": "node --experimental-strip-types --test scripts/artwork-policy.test.mjs",
+    "test:broadcast": "node --experimental-strip-types --test scripts/broadcast-migration.test.mjs scripts/broadcast-scheduler.test.mjs scripts/broadcast-snapshot-size.test.mjs scripts/live-source-safety.test.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "dotenv -e .env.local -- node scripts/migrate.mjs",
     "db:studio": "dotenv -e .env.local -- drizzle-kit studio"
@@ -15,7 +16,9 @@
   "dependencies": {
     "@clerk/nextjs": "^7.8.0",
     "@neondatabase/serverless": "^1.1.0",
+    "@vercel/blob": "^2.8.0",
     "drizzle-orm": "^0.45.2",
+    "hls.js": "^1.7.1",
     "lucide-react": "1.33.0",
     "next": "16.3.2",
     "react": "19.2.8",

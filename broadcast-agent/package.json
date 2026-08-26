@@ -1,0 +1,14 @@
+{
+  "name": "@neusecast/broadcast-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "start": "node src/index.mjs",
+    "check": "node --check src/*.mjs && node --check test/*.test.mjs",
+    "test": "node --test --test-reporter=spec test/*.test.mjs"
+  }
+}

@@ -1,0 +1,14 @@
+FROM debian:bookworm-slim
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates ffmpeg tini \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid 10002 relay \
+    && useradd --uid 10002 --gid 10002 --create-home --shell /usr/sbin/nologin relay
+
+COPY relay-stream.sh /usr/local/bin/neusecast-stream-relay
+RUN chmod 0755 /usr/local/bin/neusecast-stream-relay
+
+USER relay
+EXPOSE 10000/udp
+ENTRYPOINT ["/usr/bin/tini", "-g", "--", "/usr/local/bin/neusecast-stream-relay"]

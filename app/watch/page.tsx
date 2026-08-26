@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Radio, RadioTower } from "lucide-react";
 import { Brand } from "@/components/brand";
+import { BroadcastStreamPlayer } from "@/components/broadcast-stream-player";
 import { PlayerRuntime } from "@/components/player-runtime";
 import { getNetworkChannelManifest } from "@/lib/player/network-channel";
 
@@ -13,7 +14,8 @@ export const metadata: Metadata = {
 };
 
 export default async function WatchPage() {
-  const manifest = await getNetworkChannelManifest();
+  const hlsSource = process.env.NEXT_PUBLIC_BROADCAST_HLS_URL?.trim();
+  const manifest = hlsSource ? null : await getNetworkChannelManifest();
 
   return (
     <main className="watch-page">
@@ -45,13 +47,17 @@ export default async function WatchPage() {
 
       <section className="watch-player-section sales-container" aria-label="NeuseCast live network channel">
         <div className="watch-player-frame">
-          <PlayerRuntime
-            initialManifest={manifest}
-            playerKey="network-live"
-            playerVersion="neusecast-network-web"
-            publicFeed
-            embedded
-          />
+          {hlsSource ? (
+            <BroadcastStreamPlayer source={hlsSource} />
+          ) : manifest ? (
+            <PlayerRuntime
+              initialManifest={manifest}
+              playerKey="network-live"
+              playerVersion="neusecast-network-web"
+              publicFeed
+              embedded
+            />
+          ) : null}
         </div>
         <div className="watch-underbar">
           <span><Radio size={15} aria-hidden="true" /> NeuseCast Network</span>

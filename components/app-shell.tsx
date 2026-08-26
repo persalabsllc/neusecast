@@ -15,6 +15,7 @@ import {
   Megaphone,
   MonitorPlay,
   Newspaper,
+  Radio,
   RadioTower,
   X,
 } from "lucide-react";
@@ -28,6 +29,7 @@ const primaryNavigation = [
   { label: "Campaigns", href: "/control/campaigns", icon: Megaphone },
   { label: "Host Prospects", href: "/control/prospects", icon: Handshake },
   { label: "Schedule", href: "/control/schedule", icon: CalendarClock },
+  { label: "Broadcast Studio", href: "/studio", icon: Radio },
 ] as const;
 
 const pageTitles: Record<string, { eyebrow: string; title: string }> = {

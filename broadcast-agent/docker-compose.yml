@@ -1,0 +1,84 @@
+name: neusecast-playout
+
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  stream-relay:
+    build:
+      context: ../infra/casparcg
+      dockerfile: Dockerfile.relay
+    restart: unless-stopped
+    environment:
+      STREAM_PROTOCOL: ${STREAM_PROTOCOL:-rtmps}
+      STREAM_OUTPUT_URL: ${STREAM_OUTPUT_URL:-}
+      RELAY_INPUT_URL: "udp://0.0.0.0:10000?fifo_size=1000000&overrun_nonfatal=1"
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/neusecast-relay-ready"]
+      interval: 5s
+      timeout: 2s
+      retries: 10
+      start_period: 5s
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
+
+  casparcg:
+    platform: linux/amd64
+    build:
+      context: ../infra/casparcg
+    restart: unless-stopped
+    environment:
+      CASPAR_RELAY_URL: "udp://stream-relay:10000?pkt_size=1316"
+    volumes:
+      - media:/var/lib/casparcg/media
+      - caspar-data:/var/lib/casparcg/data
+    tmpfs:
+      - /var/lib/casparcg/cache:size=536870912,mode=0750,uid=10001,gid=10001
+    ports:
+      - "127.0.0.1:5250:5250"
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 5250"]
+      interval: 5s
+      timeout: 2s
+      retries: 20
+      start_period: 20s
+    depends_on:
+      stream-relay:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
+
+  broadcast-agent:
+    build:
+      context: .
+    restart: unless-stopped
+    stop_grace_period: 30s
+    env_file:
+      - .env
+    environment:
+      CASPAR_HOST: casparcg
+      MEDIA_CACHE_DIR: /var/lib/casparcg/media
+      AGENT_STATE_DIR: /var/lib/neusecast-agent
+      # Bind inside the container; the published host port remains loopback-only.
+      LOCAL_HEALTH_HOST: 0.0.0.0
+    volumes:
+      - media:/var/lib/casparcg/media
+      - agent-state:/var/lib/neusecast-agent
+    ports:
+      - "127.0.0.1:8787:8787"
+    depends_on:
+      casparcg:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
+
+volumes:
+  media:
+  agent-state:
+  caspar-data:
