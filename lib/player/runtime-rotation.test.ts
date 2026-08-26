@@ -13,6 +13,7 @@ import {
   NETWORK_WIDE_CONTENT_MARKET,
   REGIONAL_CONTENT_MARKET,
 } from "./content-markets";
+import { isNeusecastHouseAdId, neusecastHouseAdPlacement } from "./house-ad";
 
 function item(id: string, overrides: Partial<PlayerItem> = {}): PlayerItem {
   return {
@@ -52,6 +53,33 @@ test("evergreen cards continue through the full rotation without a client replay
     completedAt: Date.parse("2026-08-26T14:00:24Z"),
     lastNewsroomPlayAt: 0,
   }), 0);
+});
+
+test("unique house bumper placements cannot jump a player back into a six-slide loop", () => {
+  const items = [
+    ...Array.from({ length: 6 }, (_, index) => item(`first-${index + 1}`)),
+    neusecastHouseAdPlacement(0),
+    ...Array.from({ length: 6 }, (_, index) => item(`second-${index + 1}`)),
+    neusecastHouseAdPlacement(1),
+    item("tail"),
+  ];
+  const visitedIds: string[] = [items[0].id];
+  let currentId = items[0].id;
+
+  for (let step = 1; step < items.length; step += 1) {
+    const nextIndex = nextRotationIndex(items, currentId, {
+      completedAt: Date.parse("2026-08-26T14:00:00Z") + step * 12_000,
+      lastNewsroomPlayAt: 0,
+    });
+    currentId = items[nextIndex].id;
+    visitedIds.push(currentId);
+  }
+
+  assert.equal(new Set(items.map((entry) => entry.id)).size, items.length);
+  assert.deepEqual(visitedIds, items.map((entry) => entry.id));
+  assert.equal(retainedActiveIndex(items, neusecastHouseAdPlacement(1).id), 13);
+  assert.equal(isNeusecastHouseAdId(neusecastHouseAdPlacement(0).id), true);
+  assert.equal(isNeusecastHouseAdId(neusecastHouseAdPlacement(1).id), true);
 });
 
 test("newsroom spacing remains active while routine content advances", () => {
