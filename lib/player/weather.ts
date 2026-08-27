@@ -181,7 +181,7 @@ async function requestRegionalForecast(): Promise<RegionalForecast> {
 
 async function requestRegionalAlerts(): Promise<PlayerAlert[]> {
   const alerts = await nwsJson<NwsAlertsResponse>(
-    `https://api.weather.gov/alerts/active?point=${REGIONAL_POINT.latitude},${REGIONAL_POINT.longitude}&status=actual`,
+    `https://api.weather.gov/alerts/active?point=${REGIONAL_POINT.latitude},${REGIONAL_POINT.longitude}`,
   );
   const now = Date.now();
   return (alerts.features ?? []).flatMap((feature) => {

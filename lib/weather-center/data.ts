@@ -117,7 +117,7 @@ async function locationTemperatures() {
 }
 
 async function alerts() {
-  const payload = object(await json(`https://api.weather.gov/alerts/active?point=${PRIMARY_POINT.latitude},${PRIMARY_POINT.longitude}&status=actual`));
+  const payload = object(await json(`https://api.weather.gov/alerts/active?point=${PRIMARY_POINT.latitude},${PRIMARY_POINT.longitude}`));
   return list(payload.features).slice(0, 8).flatMap((raw) => {
     const feature = object(raw);
     const properties = object(feature.properties);
