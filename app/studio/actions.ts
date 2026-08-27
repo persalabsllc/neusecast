@@ -669,6 +669,29 @@ export async function updateAssetAction(input: {
   return { ok: true, message: "Library metadata updated." };
 }
 
+export async function updateAssetCategoryAction(input: {
+  assetId: string;
+  category: string;
+}): Promise<StudioActionResult> {
+  await requireBroadcastOperator();
+  const assetId = uuid(input.assetId);
+  const category = text(input.category, 40);
+  if (!assetId || !MEDIA_CATEGORIES.has(category as never)) {
+    return { ok: false, message: "Choose a valid library category." };
+  }
+  const result = await getDatabase()
+    .update(broadcastMediaAssets)
+    .set({
+      category: category as typeof broadcastMediaAssets.$inferInsert.category,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(broadcastMediaAssets.id, assetId), isNull(broadcastMediaAssets.archivedAt)))
+    .returning({ id: broadcastMediaAssets.id });
+  if (!result.length) return { ok: false, message: "The selected asset no longer exists." };
+  revalidateStudio();
+  return { ok: true, message: `Category changed to ${category.replaceAll("_", " ")}.` };
+}
+
 export async function archiveAssetAction(assetIdInput: string): Promise<StudioActionResult> {
   await requireBroadcastOperator();
   const assetId = uuid(assetIdInput);
