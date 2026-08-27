@@ -286,6 +286,7 @@ export async function GET(request: Request) {
               assetName: broadcastMediaAssets.name,
               assetKind: broadcastMediaAssets.kind,
               assetCategory: broadcastMediaAssets.category,
+              assetSegment: broadcastMediaAssets.segment,
               liveSourceId: broadcastLiveSources.id,
               liveSourceSlug: broadcastLiveSources.slug,
               liveSourceName: broadcastLiveSources.name,
@@ -412,6 +413,7 @@ export async function GET(request: Request) {
           assetName: broadcastMediaAssets.name,
           assetKind: broadcastMediaAssets.kind,
           category: broadcastMediaAssets.category,
+          segment: broadcastMediaAssets.segment,
           revision: broadcastMediaVersions.revision,
           status: broadcastMediaVersions.status,
           originalFileName: broadcastMediaVersions.originalFileName,
@@ -464,6 +466,7 @@ export async function GET(request: Request) {
             assetName: row.assetName,
             assetKind: row.assetKind,
             category: row.assetCategory,
+            segment: row.assetSegment,
             versionId: row.mediaVersionId,
             revision: row.mediaRevision,
             status: row.mediaStatus,
@@ -505,6 +508,8 @@ export async function GET(request: Request) {
         playbackUrl: item.media.playbackUrl,
         mimeType: item.media.mimeType,
         sha256: item.media.sha256,
+        category: item.media.category,
+        segment: item.media.segment,
       });
     }
 
@@ -535,6 +540,7 @@ export async function GET(request: Request) {
         assetName: row.assetName,
         assetKind: row.assetKind,
         category: row.category,
+        segment: row.segment,
         revision: row.revision,
         status: row.status,
         originalFileName: row.originalFileName,

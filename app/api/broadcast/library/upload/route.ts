@@ -3,6 +3,11 @@ import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { getDatabase } from "@/lib/db";
 import { broadcastMediaAssets, broadcastMediaVersions } from "@/lib/db/schema";
 import { requireBroadcastOperator } from "@/lib/broadcast/control-auth";
+import {
+  mediaClassification,
+  type BroadcastMediaCategory,
+  type BroadcastSegment,
+} from "@/lib/broadcast/media-taxonomy";
 
 export const runtime = "nodejs";
 
@@ -26,24 +31,10 @@ const ALLOWED_CONTENT_TYPES = [
   "application/ttml+xml",
 ] as const;
 
-const MEDIA_CATEGORIES = new Set([
-  "program",
-  "news",
-  "weather",
-  "events",
-  "commercial",
-  "promo",
-  "bumper",
-  "psa",
-  "filler",
-  "emergency",
-  "live_recording",
-  "other",
-] as const);
-
 type UploadMetadata = {
   name: string;
-  category: (typeof MEDIA_CATEGORIES extends Set<infer T> ? T : never);
+  category: BroadcastMediaCategory;
+  segment: BroadcastSegment | null;
   originalFileName: string;
   mimeType: string;
   fileSizeBytes: number | null;
@@ -103,17 +94,20 @@ function parseClientPayload(raw: string | null, userId: string): UploadMetadata 
   const originalFileName = boundedText(payload.originalFileName, 255);
   const mimeType = boundedText(payload.mimeType, 160).toLowerCase();
   const category = boundedText(payload.category, 40);
+  const segment = boundedText(payload.segment, 40) || null;
+  const classification = mediaClassification(category, segment);
 
   if (!name || !originalFileName || !ALLOWED_CONTENT_TYPES.includes(mimeType as (typeof ALLOWED_CONTENT_TYPES)[number])) {
     throw new Error("The selected media type is not supported.");
   }
-  if (!MEDIA_CATEGORIES.has(category as UploadMetadata["category"])) {
-    throw new Error("Choose a valid library category.");
+  if (!classification) {
+    throw new Error("Choose a valid library category and segment.");
   }
 
   return {
     name,
-    category: category as UploadMetadata["category"],
+    category: classification.category,
+    segment: classification.segment,
     originalFileName,
     mimeType,
     fileSizeBytes: boundedPositiveInteger(payload.fileSizeBytes, MAX_UPLOAD_BYTES),
@@ -127,7 +121,8 @@ function parseClientPayload(raw: string | null, userId: string): UploadMetadata 
 function parseTokenPayload(raw: string | null | undefined): UploadMetadata {
   if (!raw || raw.length > MAX_PAYLOAD_LENGTH) throw new Error("Signed upload metadata is missing.");
   const parsed = JSON.parse(raw) as UploadMetadata;
-  if (!parsed || typeof parsed !== "object" || !parsed.name || !parsed.mimeType || !parsed.category) {
+  if (!parsed || typeof parsed !== "object" || !parsed.name || !parsed.mimeType || !parsed.category
+    || !mediaClassification(parsed.category, parsed.segment)) {
     throw new Error("Signed upload metadata is invalid.");
   }
   return parsed;
@@ -175,6 +170,7 @@ export async function POST(request: Request) {
             name: metadata.name,
             kind,
             category: metadata.category,
+            segment: metadata.segment,
             status: needsIngest ? "processing" : "ready",
             durationMs: metadata.durationMs ?? (kind === "image" ? 10_000 : null),
             metadata: {

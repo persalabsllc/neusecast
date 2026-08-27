@@ -16,6 +16,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+import { BROADCAST_MEDIA_CATEGORIES, BROADCAST_SEGMENTS } from "@/lib/broadcast/media-taxonomy";
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -79,20 +80,8 @@ export const hostProspectDeliveryStatus = pgEnum("host_prospect_delivery_status"
 ]);
 
 export const broadcastMediaKind = pgEnum("broadcast_media_kind", ["video", "audio", "image", "caption", "graphic"]);
-export const broadcastMediaCategory = pgEnum("broadcast_media_category", [
-  "program",
-  "news",
-  "weather",
-  "events",
-  "commercial",
-  "promo",
-  "bumper",
-  "psa",
-  "filler",
-  "emergency",
-  "live_recording",
-  "other",
-]);
+export const broadcastMediaCategory = pgEnum("broadcast_media_category", BROADCAST_MEDIA_CATEGORIES);
+export const broadcastSegment = pgEnum("broadcast_segment", BROADCAST_SEGMENTS);
 export const broadcastMediaStatus = pgEnum("broadcast_media_status", ["uploading", "processing", "ready", "failed", "archived"]);
 export const broadcastMediaVersionStatus = pgEnum("broadcast_media_version_status", [
   "pending",
@@ -731,6 +720,7 @@ export const broadcastMediaAssets = pgTable(
     description: text("description"),
     kind: broadcastMediaKind("kind").notNull(),
     category: broadcastMediaCategory("category").default("other").notNull(),
+    segment: broadcastSegment("segment"),
     status: broadcastMediaStatus("status").default("uploading").notNull(),
     durationMs: integer("duration_ms"),
     tags: jsonb("tags").$type<string[]>().default([]).notNull(),
@@ -747,8 +737,17 @@ export const broadcastMediaAssets = pgTable(
   (table) => [
     uniqueIndex("broadcast_media_assets_slug_idx").on(table.slug),
     index("broadcast_media_assets_library_idx").on(table.status, table.category, table.kind, table.createdAt),
+    index("broadcast_media_assets_segment_idx").on(table.category, table.segment, table.status, table.createdAt),
     index("broadcast_media_assets_availability_idx").on(table.availableFrom, table.availableUntil),
     check("broadcast_media_assets_duration_check", sql`${table.durationMs} is null or ${table.durationMs} > 0`),
+    check(
+      "broadcast_media_assets_segment_check",
+      sql`(
+        ${table.category}::text in ('segment_intro', 'segment_tease', 'segment_outro') and ${table.segment} is not null
+      ) or (
+        ${table.category}::text not in ('segment_intro', 'segment_tease', 'segment_outro') and ${table.segment} is null
+      )`,
+    ),
     check(
       "broadcast_media_assets_availability_check",
       sql`${table.availableUntil} is null or ${table.availableFrom} is null or ${table.availableUntil} > ${table.availableFrom}`,
