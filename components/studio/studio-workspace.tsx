@@ -58,6 +58,7 @@ import {
   setLiveSourceAutoFailoverAction,
   setTickerActiveAction,
   updateAssetAction,
+  updateAssetCategoryAction,
   updateOutputAutomationAction,
   type StudioActionResult,
 } from "@/app/studio/actions";
@@ -723,6 +724,7 @@ function LibraryView({ data, working, runAction, onNotice }: ViewProps & { onNot
   const [uploadCategory, setUploadCategory] = useState<(typeof categories)[number]>("program");
   const [draggingFiles, setDraggingFiles] = useState(false);
   const [uploads, setUploads] = useState<UploadEntry[]>([]);
+  const [assetCategoryDrafts, setAssetCategoryDrafts] = useState<Record<string, string>>({});
   const [selectedId, setSelectedId] = useState<string | null>(data.assets[0]?.id ?? null);
   const selectedAsset = data.assets.find((asset) => asset.id === selectedId) ?? null;
   const selectedLog = data.selectedLog;
@@ -811,6 +813,20 @@ function LibraryView({ data, working, runAction, onNotice }: ViewProps & { onNot
       `add-${assetId}`,
       () => addAssetToLogAction({ logId: selectedLog.id, assetId, expectedRevision: selectedLog.revision }),
     );
+  }
+
+  async function changeAssetCategory(asset: StudioAsset, nextCategory: string) {
+    setAssetCategoryDrafts((current) => ({ ...current, [asset.id]: nextCategory }));
+    const result = await runAction(
+      `category-${asset.id}`,
+      () => updateAssetCategoryAction({
+        assetId: asset.id,
+        category: nextCategory,
+      }),
+    );
+    if (!result?.ok) {
+      setAssetCategoryDrafts((current) => ({ ...current, [asset.id]: asset.category }));
+    }
   }
 
   return (
@@ -916,7 +932,21 @@ function LibraryView({ data, working, runAction, onNotice }: ViewProps & { onNot
                       <button type="button" onClick={() => setSelectedId(asset.id)}><strong>{asset.name}</strong></button>
                       <StatusPill status={asset.status} />
                     </div>
-                    <div className={styles.assetMeta}><span>{displayCategory(asset.category)}</span><span>{formatBytes(asset.fileSizeBytes)}</span></div>
+                    <div className={styles.assetMeta}>
+                      <label className={styles.assetCategoryField}>
+                        <span className={styles.srOnly}>Category for {asset.name}</span>
+                        <select
+                          aria-label={`Category for ${asset.name}`}
+                          value={assetCategoryDrafts[asset.id] ?? asset.category}
+                          disabled={Boolean(working)}
+                          onChange={(event) => void changeAssetCategory(asset, event.target.value)}
+                        >
+                          {categories.map((item) => <option key={item} value={item}>{displayCategory(item)}</option>)}
+                        </select>
+                        {working === `category-${asset.id}` ? <Loader2 className={styles.spin} size={13} aria-label="Saving category" /> : null}
+                      </label>
+                      <span>{formatBytes(asset.fileSizeBytes)}</span>
+                    </div>
                     <div className={styles.assetActions}>
                       <button
                         type="button"
@@ -925,6 +955,16 @@ function LibraryView({ data, working, runAction, onNotice }: ViewProps & { onNot
                         onClick={() => void addAsset(asset.id)}
                       ><Plus size={14} /> Add to log</button>
                       {asset.sourceUrl ? <a href={asset.sourceUrl} download target="_blank" rel="noreferrer"><Download size={14} /> Original</a> : null}
+                      <button
+                        className={styles.assetDeleteButton}
+                        type="button"
+                        disabled={Boolean(working)}
+                        onClick={() => void runAction(
+                          `archive-${asset.id}`,
+                          () => archiveAssetAction(asset.id),
+                          `Delete “${asset.name}” from the library? Published logs will keep their pinned copy.`,
+                        )}
+                      ><Trash2 size={14} /> Delete</button>
                     </div>
                   </div>
                 </article>
