@@ -4,6 +4,7 @@ export type StudioAsset = {
   name: string;
   kind: "video" | "audio" | "image" | "caption" | "graphic";
   category: string;
+  segment: string | null;
   status: "uploading" | "processing" | "ready" | "failed" | "archived";
   durationMs: number | null;
   sourceUrl: string | null;

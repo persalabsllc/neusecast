@@ -1094,6 +1094,14 @@
   font-size: 9px;
 }
 
+.assetClassification {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+}
+
 .assetCategoryField {
   display: inline-flex;
   min-width: 0;

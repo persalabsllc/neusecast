@@ -19,15 +19,12 @@ import {
 import { requireBroadcastOperator } from "@/lib/broadcast/control-auth";
 import { isLiveSourceTakeable, isSupportedLiveProtocol } from "@/lib/broadcast/live-source-safety";
 import { buildDailySchedule, MAX_PUBLISHED_LOG_ITEMS } from "@/lib/broadcast/scheduler";
+import { mediaClassification } from "@/lib/broadcast/media-taxonomy";
 
 export type StudioActionResult = { ok: true; message: string; id?: string } | { ok: false; message: string };
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-const MEDIA_CATEGORIES = new Set([
-  "program", "news", "weather", "events", "commercial", "promo", "bumper", "psa",
-  "filler", "emergency", "live_recording", "other",
-] as const);
 const TICKER_PRIORITIES = new Set(["routine", "important", "urgent", "emergency"] as const);
 
 function text(value: unknown, maximum: number) {
@@ -626,13 +623,15 @@ export async function updateAssetAction(input: {
   assetId: string;
   name: string;
   category: string;
+  segment?: string | null;
   durationSeconds?: number | null;
 }): Promise<StudioActionResult> {
   await requireBroadcastOperator();
   const assetId = uuid(input.assetId);
   const name = text(input.name, 240);
   const category = text(input.category, 40);
-  if (!assetId || !name || !MEDIA_CATEGORIES.has(category as never)) return { ok: false, message: "Enter valid library details." };
+  const classification = mediaClassification(category, text(input.segment, 40) || null);
+  if (!assetId || !name || !classification) return { ok: false, message: "Enter a valid category and segment." };
   const seconds = Number(input.durationSeconds);
   const durationMs = Number.isFinite(seconds) && seconds > 0 ? Math.min(Math.round(seconds * 1_000), 86_400_000) : null;
   const database = getDatabase();
@@ -647,7 +646,13 @@ export async function updateAssetAction(input: {
   await database.batch([
     database
       .update(broadcastMediaAssets)
-      .set({ name, category: category as typeof broadcastMediaAssets.$inferInsert.category, ...(editorialDurationMs ? { durationMs: editorialDurationMs } : {}), updatedAt: now })
+      .set({
+        name,
+        category: classification.category,
+        segment: classification.segment,
+        ...(editorialDurationMs ? { durationMs: editorialDurationMs } : {}),
+        updatedAt: now,
+      })
       .where(eq(broadcastMediaAssets.id, assetId)),
     // Still and graphic durations are editorial timing, not an ffprobe fact.
     // Keep the pinned current version aligned so manual and generated logs do
@@ -672,24 +677,27 @@ export async function updateAssetAction(input: {
 export async function updateAssetCategoryAction(input: {
   assetId: string;
   category: string;
+  segment?: string | null;
 }): Promise<StudioActionResult> {
   await requireBroadcastOperator();
   const assetId = uuid(input.assetId);
   const category = text(input.category, 40);
-  if (!assetId || !MEDIA_CATEGORIES.has(category as never)) {
-    return { ok: false, message: "Choose a valid library category." };
+  const classification = mediaClassification(category, text(input.segment, 40) || null);
+  if (!assetId || !classification) {
+    return { ok: false, message: "Choose a valid category and segment." };
   }
   const result = await getDatabase()
     .update(broadcastMediaAssets)
     .set({
-      category: category as typeof broadcastMediaAssets.$inferInsert.category,
+      category: classification.category,
+      segment: classification.segment,
       updatedAt: new Date(),
     })
     .where(and(eq(broadcastMediaAssets.id, assetId), isNull(broadcastMediaAssets.archivedAt)))
     .returning({ id: broadcastMediaAssets.id });
   if (!result.length) return { ok: false, message: "The selected asset no longer exists." };
   revalidateStudio();
-  return { ok: true, message: `Category changed to ${category.replaceAll("_", " ")}.` };
+  return { ok: true, message: "Library classification updated." };
 }
 
 export async function archiveAssetAction(assetIdInput: string): Promise<StudioActionResult> {

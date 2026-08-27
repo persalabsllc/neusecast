@@ -26,6 +26,7 @@ export async function GET(request: Request) {
       assetId: broadcastMediaAssets.id,
       name: broadcastMediaAssets.name,
       category: broadcastMediaAssets.category,
+      segment: broadcastMediaAssets.segment,
       kind: broadcastMediaAssets.kind,
       status: broadcastMediaAssets.status,
       durationMs: broadcastMediaAssets.durationMs,
@@ -62,7 +63,7 @@ export async function GET(request: Request) {
   }
 
   const headings = [
-    "asset_id", "name", "category", "kind", "status", "duration_ms", "tags", "rights_owner",
+    "asset_id", "name", "category", "segment", "kind", "status", "duration_ms", "tags", "rights_owner",
     "rights_expires_at", "version_id", "revision", "original_file_name", "mime_type", "file_size_bytes",
     "width", "height", "playback_url", "created_at",
   ];
@@ -72,6 +73,7 @@ export async function GET(request: Request) {
       row.assetId,
       row.name,
       row.category,
+      row.segment,
       row.kind,
       row.status,
       row.durationMs,

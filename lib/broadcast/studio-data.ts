@@ -49,6 +49,7 @@ export async function loadStudioDashboard(
         name: broadcastMediaAssets.name,
         kind: broadcastMediaAssets.kind,
         category: broadcastMediaAssets.category,
+        segment: broadcastMediaAssets.segment,
         status: broadcastMediaAssets.status,
         durationMs: broadcastMediaAssets.durationMs,
         sourceUrl: broadcastMediaVersions.playbackUrl,

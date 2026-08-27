@@ -70,6 +70,15 @@ import type {
 } from "@/lib/broadcast/studio-types";
 import { isLiveSourceTakeable, isSupportedLiveProtocol } from "@/lib/broadcast/live-source-safety";
 import {
+  BROADCAST_MEDIA_CATEGORIES,
+  BROADCAST_MEDIA_CATEGORY_LABELS,
+  BROADCAST_SEGMENTS,
+  BROADCAST_SEGMENT_LABELS,
+  isSegmentMediaCategory,
+  type BroadcastMediaCategory,
+  type BroadcastSegment,
+} from "@/lib/broadcast/media-taxonomy";
+import {
   useEffect,
   useMemo,
   useRef,
@@ -109,35 +118,7 @@ type MediaMetadata = {
 
 const LOG_PAGE_SIZE = 200;
 
-const categories = [
-  "program",
-  "news",
-  "weather",
-  "events",
-  "commercial",
-  "promo",
-  "bumper",
-  "psa",
-  "filler",
-  "emergency",
-  "live_recording",
-  "other",
-] as const;
-
-const categoryLabels: Record<string, string> = {
-  program: "Program",
-  news: "News",
-  weather: "Weather",
-  events: "Events",
-  commercial: "Commercial",
-  promo: "Promo",
-  bumper: "Bumper",
-  psa: "PSA",
-  filler: "Filler",
-  emergency: "Emergency",
-  live_recording: "Live recording",
-  other: "Other",
-};
+const categories = BROADCAST_MEDIA_CATEGORIES;
 
 const viewTitles: Record<StudioView, { eyebrow: string; title: string; description: string }> = {
   "on-air": {
@@ -231,7 +212,12 @@ function formatBytes(value: number | null) {
 
 function displayCategory(value: string | null | undefined) {
   if (!value) return "Uncategorized";
-  return categoryLabels[value] ?? value.replaceAll("_", " ");
+  return BROADCAST_MEDIA_CATEGORY_LABELS[value as BroadcastMediaCategory] ?? value.replaceAll("_", " ");
+}
+
+function displaySegment(value: string | null | undefined) {
+  if (!value) return "Choose segment";
+  return BROADCAST_SEGMENT_LABELS[value as BroadcastSegment] ?? value.replaceAll("_", " ");
 }
 
 function isSchedulableAsset(asset: StudioAsset) {
@@ -722,9 +708,11 @@ function LibraryView({ data, working, runAction, onNotice }: ViewProps & { onNot
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("all");
   const [uploadCategory, setUploadCategory] = useState<(typeof categories)[number]>("program");
+  const [uploadSegment, setUploadSegment] = useState<BroadcastSegment>("weather");
   const [draggingFiles, setDraggingFiles] = useState(false);
   const [uploads, setUploads] = useState<UploadEntry[]>([]);
   const [assetCategoryDrafts, setAssetCategoryDrafts] = useState<Record<string, string>>({});
+  const [assetSegmentDrafts, setAssetSegmentDrafts] = useState<Record<string, string | null>>({});
   const [selectedId, setSelectedId] = useState<string | null>(data.assets[0]?.id ?? null);
   const selectedAsset = data.assets.find((asset) => asset.id === selectedId) ?? null;
   const selectedLog = data.selectedLog;
@@ -773,6 +761,7 @@ function LibraryView({ data, working, runAction, onNotice }: ViewProps & { onNot
           clientPayload: JSON.stringify({
             name: file.name.replace(/\.[^.]+$/, "").slice(0, 240) || file.name,
             category: uploadCategory,
+            segment: isSegmentMediaCategory(uploadCategory) ? uploadSegment : null,
             originalFileName: file.name,
             mimeType,
             fileSizeBytes: file.size,
@@ -816,16 +805,38 @@ function LibraryView({ data, working, runAction, onNotice }: ViewProps & { onNot
   }
 
   async function changeAssetCategory(asset: StudioAsset, nextCategory: string) {
+    const nextSegment = isSegmentMediaCategory(nextCategory)
+      ? (assetSegmentDrafts[asset.id] ?? asset.segment ?? "weather")
+      : null;
     setAssetCategoryDrafts((current) => ({ ...current, [asset.id]: nextCategory }));
+    setAssetSegmentDrafts((current) => ({ ...current, [asset.id]: nextSegment }));
     const result = await runAction(
       `category-${asset.id}`,
       () => updateAssetCategoryAction({
         assetId: asset.id,
         category: nextCategory,
+        segment: nextSegment,
       }),
     );
     if (!result?.ok) {
       setAssetCategoryDrafts((current) => ({ ...current, [asset.id]: asset.category }));
+      setAssetSegmentDrafts((current) => ({ ...current, [asset.id]: asset.segment }));
+    }
+  }
+
+  async function changeAssetSegment(asset: StudioAsset, nextSegment: string) {
+    const nextCategory = assetCategoryDrafts[asset.id] ?? asset.category;
+    setAssetSegmentDrafts((current) => ({ ...current, [asset.id]: nextSegment }));
+    const result = await runAction(
+      `category-${asset.id}`,
+      () => updateAssetCategoryAction({
+        assetId: asset.id,
+        category: nextCategory,
+        segment: nextSegment,
+      }),
+    );
+    if (!result?.ok) {
+      setAssetSegmentDrafts((current) => ({ ...current, [asset.id]: asset.segment }));
     }
   }
 
@@ -870,6 +881,14 @@ function LibraryView({ data, working, runAction, onNotice }: ViewProps & { onNot
                 {categories.map((item) => <option key={item} value={item}>{displayCategory(item)}</option>)}
               </select>
             </label>
+            {isSegmentMediaCategory(uploadCategory) ? (
+              <label className={styles.compactField}>
+                <span>Segment</span>
+                <select value={uploadSegment} onChange={(event) => setUploadSegment(event.target.value as BroadcastSegment)}>
+                  {BROADCAST_SEGMENTS.map((item) => <option key={item} value={item}>{displaySegment(item)}</option>)}
+                </select>
+              </label>
+            ) : null}
             <button className={styles.secondaryButton} type="button" onClick={() => inputRef.current?.click()}>Choose files</button>
           </section>
 
@@ -933,18 +952,33 @@ function LibraryView({ data, working, runAction, onNotice }: ViewProps & { onNot
                       <StatusPill status={asset.status} />
                     </div>
                     <div className={styles.assetMeta}>
-                      <label className={styles.assetCategoryField}>
-                        <span className={styles.srOnly}>Category for {asset.name}</span>
-                        <select
-                          aria-label={`Category for ${asset.name}`}
-                          value={assetCategoryDrafts[asset.id] ?? asset.category}
-                          disabled={Boolean(working)}
-                          onChange={(event) => void changeAssetCategory(asset, event.target.value)}
-                        >
-                          {categories.map((item) => <option key={item} value={item}>{displayCategory(item)}</option>)}
-                        </select>
-                        {working === `category-${asset.id}` ? <Loader2 className={styles.spin} size={13} aria-label="Saving category" /> : null}
-                      </label>
+                      <div className={styles.assetClassification}>
+                        <label className={styles.assetCategoryField}>
+                          <span className={styles.srOnly}>Category for {asset.name}</span>
+                          <select
+                            aria-label={`Category for ${asset.name}`}
+                            value={assetCategoryDrafts[asset.id] ?? asset.category}
+                            disabled={Boolean(working)}
+                            onChange={(event) => void changeAssetCategory(asset, event.target.value)}
+                          >
+                            {categories.map((item) => <option key={item} value={item}>{displayCategory(item)}</option>)}
+                          </select>
+                        </label>
+                        {isSegmentMediaCategory(assetCategoryDrafts[asset.id] ?? asset.category) ? (
+                          <label className={styles.assetCategoryField}>
+                            <span className={styles.srOnly}>Segment for {asset.name}</span>
+                            <select
+                              aria-label={`Segment for ${asset.name}`}
+                              value={assetSegmentDrafts[asset.id] ?? asset.segment ?? "weather"}
+                              disabled={Boolean(working)}
+                              onChange={(event) => void changeAssetSegment(asset, event.target.value)}
+                            >
+                              {BROADCAST_SEGMENTS.map((item) => <option key={item} value={item}>{displaySegment(item)}</option>)}
+                            </select>
+                          </label>
+                        ) : null}
+                        {working === `category-${asset.id}` ? <Loader2 className={styles.spin} size={13} aria-label="Saving classification" /> : null}
+                      </div>
                       <span>{formatBytes(asset.fileSizeBytes)}</span>
                     </div>
                     <div className={styles.assetActions}>
@@ -1003,6 +1037,7 @@ function LibraryView({ data, working, runAction, onNotice }: ViewProps & { onNot
 function AssetInspector({ asset, working, runAction }: { asset: StudioAsset | null } & Pick<ViewProps, "working" | "runAction">) {
   const [name, setName] = useState(asset?.name ?? "");
   const [category, setCategory] = useState(asset?.category ?? "other");
+  const [segment, setSegment] = useState(asset?.segment ?? "weather");
   const [duration, setDuration] = useState(asset?.durationMs ? String(asset.durationMs / 1_000) : "");
 
   if (!asset) {
@@ -1025,6 +1060,7 @@ function AssetInspector({ asset, working, runAction }: { asset: StudioAsset | nu
             assetId: asset.id,
             name,
             category,
+            segment: isSegmentMediaCategory(category) ? segment : null,
             durationSeconds: duration ? Number(duration) : null,
           }));
         }}
@@ -1032,6 +1068,7 @@ function AssetInspector({ asset, working, runAction }: { asset: StudioAsset | nu
         <label className={styles.field}><span>Display name</span><input value={name} onChange={(event) => setName(event.target.value)} required maxLength={240} /></label>
         <div className={styles.twoFields}>
           <label className={styles.field}><span>Category</span><select value={category} onChange={(event) => setCategory(event.target.value)}>{categories.map((item) => <option key={item} value={item}>{displayCategory(item)}</option>)}</select></label>
+          {isSegmentMediaCategory(category) ? <label className={styles.field}><span>Segment</span><select value={segment} onChange={(event) => setSegment(event.target.value)}>{BROADCAST_SEGMENTS.map((item) => <option key={item} value={item}>{displaySegment(item)}</option>)}</select></label> : null}
           <label className={styles.field}><span>{canEditDuration ? "On-air duration (sec)" : "Verified duration (sec)"}</span><input type="number" min="0.1" max="86400" step="0.1" value={duration} disabled={!canEditDuration} title={canEditDuration ? "Set how long this still remains on air." : "Timed-media duration comes from playout ingest validation."} onChange={(event) => setDuration(event.target.value)} /></label>
         </div>
         <dl className={styles.techList}>
