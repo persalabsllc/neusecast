@@ -1,5 +1,9 @@
 type HydratedProgramItem = {
   id: string;
+  sourceKind: string;
+  dynamicKey: string | null;
+  dynamicUrl?: string | null;
+  durationMs: number;
   plannedStartAt: string;
   plannedEndAt: string;
   transition: unknown;
@@ -12,6 +16,10 @@ type HydratedProgramItem = {
 export function compactAgentProgramItem(item: HydratedProgramItem) {
   return {
     id: item.id,
+    sourceKind: item.sourceKind,
+    dynamicKey: item.dynamicKey,
+    durationMs: item.durationMs,
+    ...(item.dynamicKey && item.dynamicUrl ? { dynamicUrl: item.dynamicUrl } : {}),
     plannedStartAt: item.plannedStartAt,
     plannedEndAt: item.plannedEndAt,
     transition: item.transition,

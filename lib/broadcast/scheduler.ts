@@ -4,6 +4,7 @@ export type SchedulableAsset = {
   name: string;
   category: string;
   durationMs: number;
+  dynamicKey?: string | null;
 };
 
 export type PlannedAsset = SchedulableAsset & {

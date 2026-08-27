@@ -15,10 +15,11 @@ import {
   broadcastProgramItems,
   broadcastProgramLogs,
   broadcastTickerItems,
+  broadcastWeatherCenters,
 } from "@/lib/db/schema";
 import { requireBroadcastOperator } from "@/lib/broadcast/control-auth";
 import { isLiveSourceTakeable, isSupportedLiveProtocol } from "@/lib/broadcast/live-source-safety";
-import { buildDailySchedule, MAX_PUBLISHED_LOG_ITEMS } from "@/lib/broadcast/scheduler";
+import { buildDailySchedule, MAX_PUBLISHED_LOG_ITEMS, type SchedulableAsset } from "@/lib/broadcast/scheduler";
 import { mediaClassification } from "@/lib/broadcast/media-taxonomy";
 
 export type StudioActionResult = { ok: true; message: string; id?: string } | { ok: false; message: string };
@@ -306,11 +307,33 @@ export async function generateDailyLogAction(logIdInput: string, expectedRevisio
       isNull(broadcastMediaVersions.archivedAt),
     ));
 
-  const schedule = buildDailySchedule(
-    media.flatMap((asset) => {
+  const schedulableMedia: SchedulableAsset[] = media.flatMap((asset) => {
       const durationMs = asset.versionDurationMs ?? asset.assetDurationMs;
-      return durationMs && ["video", "image", "graphic"].includes(asset.kind) ? [{ ...asset, durationMs }] : [];
-    }),
+      return durationMs && ["video", "image", "graphic"].includes(asset.kind) ? [{
+        assetId: asset.assetId,
+        versionId: asset.versionId,
+        name: asset.name,
+        category: asset.category,
+        durationMs,
+      }] : [];
+    });
+  const [weatherCenter] = await db.select({
+    enabled: broadcastWeatherCenters.graphicsOnlyFallback,
+    durationSeconds: broadcastWeatherCenters.reportDurationSeconds,
+  }).from(broadcastWeatherCenters).where(eq(broadcastWeatherCenters.outputId, log.outputId)).limit(1);
+  if (weatherCenter?.enabled) {
+    schedulableMedia.push({
+      assetId: "dynamic-weather-center",
+      versionId: "dynamic-weather-center-v1",
+      name: "NeuseCast Weather Center",
+      category: "weather",
+      durationMs: weatherCenter.durationSeconds * 1_000,
+      dynamicKey: "weather_center",
+    });
+  }
+
+  const schedule = buildDailySchedule(
+    schedulableMedia,
     log.startsAt,
     log.endsAt,
     `${log.serviceDate}:r${log.revision + 1}`,
@@ -335,9 +358,11 @@ export async function generateDailyLogAction(logIdInput: string, expectedRevisio
           logId: log.id,
           position: item.position,
           label: item.name,
-          sourceKind: "asset" as const,
+          sourceKind: item.dynamicKey ? "dynamic" as const : "asset" as const,
           mediaCategory: item.category as typeof broadcastProgramItems.$inferInsert.mediaCategory,
-          mediaVersionId: item.versionId,
+          mediaVersionId: item.dynamicKey ? null : item.versionId,
+          dynamicKey: item.dynamicKey ?? null,
+          overlayPolicy: item.dynamicKey ? { mode: "none" } : {},
           plannedStartAt: item.plannedStartAt,
           plannedEndAt: item.plannedEndAt,
           durationMs: item.durationMs,

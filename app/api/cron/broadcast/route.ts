@@ -1,4 +1,5 @@
 import { syncBroadcastAutomation } from "@/lib/broadcast/automation";
+import { refreshWeatherCenter } from "@/lib/weather-center/service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,22 +18,26 @@ export async function GET(request: Request) {
 
   const startedAt = new Date();
   try {
-    const result = await syncBroadcastAutomation(startedAt);
+    const [result, weatherCenter] = await Promise.all([
+      syncBroadcastAutomation(startedAt),
+      refreshWeatherCenter(startedAt),
+    ]);
     const completedAt = new Date();
-    if (!result.ok) {
+    if (!result.ok || !weatherCenter.ok) {
       console.error("[broadcast:cron] automation refresh completed with source errors", {
         startedAt: startedAt.toISOString(),
         completedAt: completedAt.toISOString(),
-        errors: result.errors,
+        errors: [...result.errors, ...(!weatherCenter.ok ? [weatherCenter.error] : [])],
       });
     }
 
     return Response.json({
       ...result,
+      weatherCenter,
       startedAt: startedAt.toISOString(),
       completedAt: completedAt.toISOString(),
     }, {
-      status: result.ok ? 200 : 502,
+      status: result.ok && weatherCenter.ok ? 200 : 502,
       headers: NO_STORE_HEADERS,
     });
   } catch (error) {

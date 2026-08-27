@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   ArrowLeft,
+  CloudSun,
   Layers3,
   Library,
   ListVideo,
@@ -42,6 +43,12 @@ const navigation = [
     description: "Overlays and ticker",
     href: "/studio/graphics",
     icon: Layers3,
+  },
+  {
+    label: "Weather",
+    description: "Forecasts and presenter",
+    href: "/studio/weather",
+    icon: CloudSun,
   },
   {
     label: "Live",

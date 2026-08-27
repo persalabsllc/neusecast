@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "test:artwork": "node --experimental-strip-types --test scripts/artwork-policy.test.mjs",
-    "test:broadcast": "node --experimental-strip-types --test scripts/broadcast-migration.test.mjs scripts/broadcast-scheduler.test.mjs scripts/broadcast-snapshot-size.test.mjs scripts/broadcast-taxonomy.test.mjs scripts/live-source-safety.test.mjs",
+    "test:broadcast": "node --experimental-strip-types --test scripts/broadcast-migration.test.mjs scripts/broadcast-scheduler.test.mjs scripts/broadcast-snapshot-size.test.mjs scripts/broadcast-taxonomy.test.mjs scripts/live-source-safety.test.mjs scripts/weather-center.test.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "dotenv -e .env.local -- node scripts/migrate.mjs",
     "db:studio": "dotenv -e .env.local -- drizzle-kit studio"

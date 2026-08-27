@@ -445,6 +445,7 @@ export async function GET(request: Request) {
       );
     }
 
+    const weatherCenterUrl = `${new URL(request.url).origin}/weather-center`;
     const hydratedItems = itemRows.map((row) => ({
       id: row.id,
       position: row.position,
@@ -452,6 +453,7 @@ export async function GET(request: Request) {
       sourceKind: row.sourceKind,
       mediaCategory: row.mediaCategory,
       dynamicKey: row.dynamicKey,
+      dynamicUrl: row.dynamicKey === "weather_center" ? weatherCenterUrl : null,
       plannedStartAt: row.plannedStartAt.toISOString(),
       plannedEndAt: row.plannedEndAt.toISOString(),
       durationMs: row.durationMs,

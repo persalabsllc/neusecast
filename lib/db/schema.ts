@@ -148,6 +148,12 @@ export const broadcastTickerStatus = pgEnum("broadcast_ticker_status", [
   "cancelled",
   "archived",
 ]);
+export const broadcastWeatherRunStatus = pgEnum("broadcast_weather_run_status", [
+  "generating",
+  "ready",
+  "expired",
+  "failed",
+]);
 export const broadcastClockStatus = pgEnum("broadcast_clock_status", ["draft", "active", "retired"]);
 export const broadcastProgramSource = pgEnum("broadcast_program_source", ["asset", "category", "dynamic", "live", "break"]);
 export const broadcastProgramLogStatus = pgEnum("broadcast_program_log_status", [
@@ -979,6 +985,58 @@ export const broadcastTickerItems = pgTable(
       "broadcast_ticker_items_play_count_check",
       sql`${table.playCount} >= 0 and (${table.maximumPlays} is null or ${table.maximumPlays} > 0)`,
     ),
+  ],
+);
+
+export const broadcastWeatherCenters = pgTable(
+  "broadcast_weather_centers",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    outputId: uuid("output_id")
+      .notNull()
+      .references(() => broadcastOutputs.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 180 }).default("NeuseCast Weather Center").notNull(),
+    sponsorLabel: varchar("sponsor_label", { length: 180 }).default("Captain 97.1 FM Weather Center").notNull(),
+    market: varchar("market", { length: 120 }).default("Eastern North Carolina").notNull(),
+    primaryLocation: varchar("primary_location", { length: 120 }).default("New Bern").notNull(),
+    autoRefresh: boolean("auto_refresh").default(true).notNull(),
+    graphicsOnlyFallback: boolean("graphics_only_fallback").default(true).notNull(),
+    presenterMode: boolean("presenter_mode").default(true).notNull(),
+    reportDurationSeconds: integer("report_duration_seconds").default(90).notNull(),
+    configuration: jsonb("configuration").$type<Record<string, unknown>>().default({}).notNull(),
+    createdByClerkUserId: text("created_by_clerk_user_id").references(() => appUsers.clerkUserId, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("broadcast_weather_centers_output_idx").on(table.outputId),
+    check("broadcast_weather_centers_duration_check", sql`${table.reportDurationSeconds} between 30 and 600`),
+  ],
+);
+
+export const broadcastWeatherRuns = pgTable(
+  "broadcast_weather_runs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    centerId: uuid("center_id")
+      .notNull()
+      .references(() => broadcastWeatherCenters.id, { onDelete: "cascade" }),
+    status: broadcastWeatherRunStatus("status").default("generating").notNull(),
+    issuedAt: timestamp("issued_at", { withTimezone: true }).defaultNow().notNull(),
+    validFrom: timestamp("valid_from", { withTimezone: true }).notNull(),
+    validUntil: timestamp("valid_until", { withTimezone: true }).notNull(),
+    forecastUpdatedAt: timestamp("forecast_updated_at", { withTimezone: true }),
+    data: jsonb("data").$type<Record<string, unknown>>().default({}).notNull(),
+    presenterScript: text("presenter_script").notNull(),
+    sourceSummary: jsonb("source_summary").$type<Record<string, unknown>>().default({}).notNull(),
+    severeWeatherReviewed: boolean("severe_weather_reviewed").default(false).notNull(),
+    generatedAssetId: uuid("generated_asset_id").references(() => broadcastMediaAssets.id, { onDelete: "set null" }),
+    errorMessage: text("error_message"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}).notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    index("broadcast_weather_runs_current_idx").on(table.centerId, table.status, table.validUntil, table.issuedAt),
+    check("broadcast_weather_runs_window_check", sql`${table.validUntil} > ${table.validFrom}`),
   ],
 );
 

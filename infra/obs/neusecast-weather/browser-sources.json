@@ -1,0 +1,31 @@
+{
+  "packageVersion": 1,
+  "canvas": { "width": 1920, "height": 1080, "fps": 30 },
+  "baseUrl": "https://www.neusecast.com/weather-center",
+  "sources": [
+    { "name": "Weather Open", "scene": "open" },
+    { "name": "Current Conditions", "scene": "current" },
+    { "name": "Hour by Hour", "scene": "hourly" },
+    { "name": "Seven Day", "scene": "seven-day" },
+    { "name": "Regional Temperatures", "scene": "regional" },
+    { "name": "Regional Radar", "scene": "radar" },
+    { "name": "Watches and Warnings", "scene": "alerts" },
+    { "name": "Coastal and Marine", "scene": "marine" },
+    { "name": "Neuse River Tides", "scene": "tides" },
+    { "name": "Atlantic Tropics", "scene": "tropical" },
+    { "name": "Weather Close", "scene": "close" }
+  ],
+  "browserSourceSettings": {
+    "width": 1920,
+    "height": 1080,
+    "shutdownWhenNotVisible": true,
+    "refreshWhenActive": true
+  },
+  "stream": {
+    "protocol": "rtmp",
+    "path": "weather-studio",
+    "videoBitrateKbps": 8000,
+    "audioBitrateKbps": 192,
+    "keyframeIntervalSeconds": 2
+  }
+}

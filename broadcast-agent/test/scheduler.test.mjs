@@ -82,6 +82,24 @@ test("scheduler joins a current log item and preloads the next one", async () =>
   assert.equal(events.events.find((event) => event.type === "now_playing").programItemId, "one");
 });
 
+test("scheduler plays the allowlisted Weather Center HTML producer", async () => {
+  const now = Date.now();
+  const amcp = new FakeAmcp();
+  const events = new FakeEvents();
+  const scheduler = new PlayoutScheduler({ amcp, channel: 1, layer: 10, fps: 30, fallbackClip: "FALLBACK", preloadLeadMs: 1000, eventBuffer: events, graphics: new FakeGraphics() });
+  await scheduler.update({
+    output: { alwaysOn: true }, serverTimeMs: now, receivedAtMs: now,
+    log: { id: "log", items: [{
+      id: "weather", sourceKind: "dynamic", dynamicKey: "weather_center",
+      dynamicUrl: "https://www.neusecast.com/weather-center", startMs: now - 100,
+      endMs: now + 90_000, durationMs: 90_000, overlayPolicy: "none"
+    }] }
+  }, new Map());
+  await scheduler.tick();
+  assert.equal(amcp.commands[0], 'PLAY 1-10 [HTML] "https://www.neusecast.com/weather-center"');
+  assert.equal(events.events.find((event) => event.type === "now_playing").dynamicKey, "weather_center");
+});
+
 test("a republished item cannot play a preload from its prior media version", async () => {
   const now = Date.now();
   const amcp = new FakeAmcp();

@@ -59,7 +59,7 @@ export class PlayoutScheduler {
     }
     if (this.current?.mode === "fallback" && this.current.scheduledItemId) {
       const scheduled = snapshot.log.items.find((item) => item.id === this.current.scheduledItemId);
-      if (scheduled && this.#clipFor(scheduled)) this.current.scheduledItemId = null;
+      if (scheduled && (this.#clipFor(scheduled) || this.#dynamicProducerFor(scheduled))) this.current.scheduledItemId = null;
     }
   }
 
@@ -154,6 +154,13 @@ export class PlayoutScheduler {
     return resolved?.validated === false ? null : resolved?.clipName ?? null;
   }
 
+  #dynamicProducerFor(item) {
+    if (item.dynamicKey !== "weather_center") return null;
+    const url = String(item.dynamicUrl ?? "");
+    if (!/^https:\/\/[a-z0-9.-]+(?::\d+)?(?:\/|$)/iu.test(url) || /[\r\n]/u.test(url)) return null;
+    return `[HTML] ${amcpQuote(url)}`;
+  }
+
   async #playItem(item, nowMs, {
     seekFromSchedule = true,
     closeOutcome = "completed_or_advanced",
@@ -161,15 +168,18 @@ export class PlayoutScheduler {
     fallbackWhenMissing = true
   } = {}) {
     const clip = this.#clipFor(item);
-    if (!clip) {
-      this.eventBuffer.add("error", { code: "MEDIA_NOT_READY", message: `Scheduled media is not ready: ${item.id}`, retryable: true, programItemId: item.id, mediaVersionId: item.mediaVersionId });
+    const dynamicProducer = this.#dynamicProducerFor(item);
+    if (!clip && !dynamicProducer) {
+      this.eventBuffer.add("error", { code: "MEDIA_NOT_READY", message: `Scheduled media or dynamic producer is not ready: ${item.id}`, retryable: true, programItemId: item.id, mediaVersionId: item.mediaVersionId });
       if (fallbackWhenMissing) await this.#playFallback(nowMs, "media_not_ready", item.id);
       return false;
     }
     const lateMs = seekFromSchedule ? Math.max(0, nowMs - item.startMs) : 0;
     const seekFrames = Math.floor((lateMs / 1000) * this.fps);
     const mediaVersionId = item.mediaVersionId == null ? null : String(item.mediaVersionId);
-    if (
+    if (dynamicProducer) {
+      await this.amcp.send(`PLAY ${this.address} ${dynamicProducer}`, { redactedCommand: `PLAY ${this.address} [WEATHER CENTER]` });
+    } else if (
       this.preloadedItemId === item.id &&
       this.preloadedClipName === clip &&
       this.preloadedMediaVersionId === mediaVersionId &&
@@ -193,14 +203,15 @@ export class PlayoutScheduler {
       startedAtMs: nowMs,
       plannedStartMs: item.startMs,
       plannedEndMs: item.endMs,
-      clipName: clip
+      clipName: clip ?? "weather-center-html",
+      dynamicKey: item.dynamicKey ?? null,
     };
     this.graphics.activate?.();
     if (manual) this.current.manualUntilMs = nowMs + Math.max(1000, item.durationMs ?? (item.endMs - item.startMs));
     this.graphics.setOverlayPolicy(item.overlayPolicy);
     this.eventBuffer.add("now_playing", {
       mode: "automation", logId: this.snapshot.log.id, programItemId: item.id, assetId: item.assetId,
-      mediaVersionId: item.mediaVersionId, clipName: clip, plannedStartAt: new Date(item.startMs).toISOString(),
+      mediaVersionId: item.mediaVersionId, clipName: clip ?? "weather-center-html", dynamicKey: item.dynamicKey ?? null, plannedStartAt: new Date(item.startMs).toISOString(),
       plannedEndAt: new Date(item.endMs).toISOString(), actualStartAt: new Date(nowMs).toISOString(), lateByMs: lateMs
     });
     await this.#syncGraphics({}, "program_item");
